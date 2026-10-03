@@ -1,0 +1,120 @@
+use super::*;
+
+pub const USER_STORE_SOURCE_BUILD: &str = "retrobution-20260613";
+
+pub const USER_STORE_SOURCE_ARCHIVE: &str = "main.unity3d";
+
+pub const USER_STORE_SOURCE_ARCHIVE_SHA256: &str =
+    "59788201962B6A1737B114486C361FE74EEF69F507D1D125CA3171377EEC602F";
+
+pub const USER_STORE_OPEN_SECONDS: f32 = 1.0;
+
+pub const USER_STORE_LIST_CAPACITY: usize = 5;
+
+pub const USER_STORE_EQUIPMENT_CAPACITY: usize = 9;
+
+pub const USER_STORE_GENERAL_ITEM_TYPE: i16 = 7;
+
+pub const USER_STORE_MY_SLOT_TYPE: i32 = 17;
+
+pub const USER_STORE_OTHER_SLOT_TYPE: i32 = 18;
+
+pub const USER_STORE_TITLE_SUFFIX_TYPO: &str = " Stroe";
+
+pub const USER_STORE_CANNOT_UNREGISTER: &str = "Can't unregist item.";
+
+pub const USER_STORE_CANNOT_REGISTER: &str = "Can't Regist item.";
+
+pub const USER_STORE_REGISTER_OVER_MAX: &str = "Can't Regist item.(Over Item)";
+
+pub const USER_STORE_TARGET_CLOSED_MESSAGE_KEY: &str = "Store Close";
+
+pub const USER_STORE_JEFFE_12_FONT_SIZE: f32 = 12.0;
+
+pub const USER_STORE_JEFFE_14_FONT_SIZE: f32 = 12.0;
+
+pub const USER_STORE_JEFFE_16_FONT_SIZE: f32 = 14.0;
+
+pub const USER_STORE_CHALET_SMALL_FONT_SIZE: f32 = 12.0;
+
+pub const EMPTY_ITEM_0104: ItemBase0104 = ItemBase0104 {
+    item_type: 0,
+    item_id: 0,
+    option: 0,
+    time_limit: 0,
+};
+
+// Clean `GumPopup.ShowPopup` / `InitStack` geometry. These source Rects are
+// intentionally kept verbatim; localization may only auto-fit their text.
+pub const USER_STORE_PANEL_DEPTH: i32 = 10;
+
+pub const USER_STORE_POPUP_DEPTH: i32 = 2;
+
+pub const USER_STORE_POPUP_TYPE: i32 = 7;
+
+pub const USER_STORE_POPUP_MAX_PRICE: i32 = 999_999_999;
+
+pub const USER_STORE_GENERIC_CALCULATOR_DIGIT_AREA: UserStoreUiRect =
+    UserStoreUiRect::new(25.0, 50.0, 70.0, 100.0);
+
+pub const STREETSTALL_REQ_READY: u32 = 0x1300_0091;
+
+pub const STREETSTALL_REQ_CANCEL: u32 = 0x1300_0092;
+
+pub const STREETSTALL_REQ_REGISTER_ITEM: u32 = 0x1300_0093;
+
+pub const STREETSTALL_REQ_UNREGISTER_ITEM: u32 = 0x1300_0094;
+
+pub const STREETSTALL_REQ_SALE_START: u32 = 0x1300_0095;
+
+pub const STREETSTALL_REQ_ITEM_LIST: u32 = 0x1300_0096;
+
+pub const STREETSTALL_REQ_ITEM_BUY: u32 = 0x1300_0097;
+
+pub const STREETSTALL_REP_READY_SUCCESS: u32 = 0x3100_0107;
+
+pub const STREETSTALL_REP_READY_FAIL: u32 = 0x3100_0108;
+
+pub const STREETSTALL_REP_CANCEL_SUCCESS: u32 = 0x3100_0109;
+
+pub const STREETSTALL_REP_CANCEL_FAIL: u32 = 0x3100_010A;
+
+pub const STREETSTALL_REP_REGISTER_ITEM_SUCCESS: u32 = 0x3100_010B;
+
+pub const STREETSTALL_REP_REGISTER_ITEM_FAIL: u32 = 0x3100_010C;
+
+pub const STREETSTALL_REP_UNREGISTER_ITEM_SUCCESS: u32 = 0x3100_010D;
+
+pub const STREETSTALL_REP_UNREGISTER_ITEM_FAIL: u32 = 0x3100_010E;
+
+pub const STREETSTALL_REP_SALE_START_SUCCESS: u32 = 0x3100_010F;
+
+pub const STREETSTALL_REP_SALE_START_FAIL: u32 = 0x3100_0110;
+
+pub const STREETSTALL_REP_ITEM_LIST: u32 = 0x3100_0111;
+
+pub const STREETSTALL_REP_ITEM_LIST_FAIL: u32 = 0x3100_0112;
+
+pub const STREETSTALL_REP_ITEM_BUY_SUCCESS_BUYER: u32 = 0x3100_0113;
+
+pub const STREETSTALL_REP_ITEM_BUY_SUCCESS_SELLER: u32 = 0x3100_0114;
+
+pub const STREETSTALL_REP_ITEM_BUY_FAIL: u32 = 0x3100_0115;
+
+pub const STREETSTALL_READY_SUCCESS_SIZE: usize = 16;
+
+pub const STREETSTALL_FAILURE_SIZE: usize = 4;
+
+pub const STREETSTALL_CANCEL_SUCCESS_SIZE: usize = 1;
+
+pub const STREETSTALL_REGISTER_SUCCESS_SIZE: usize = 24;
+
+pub const STREETSTALL_UNREGISTER_SUCCESS_SIZE: usize = 4;
+
+pub const STREETSTALL_SALE_START_SUCCESS_SIZE: usize = 20;
+
+pub const STREETSTALL_ITEM_LIST_HEADER_SIZE: usize = 8;
+
+pub const STREETSTALL_ITEM_LIST_RECORD_SIZE: usize = 20;
+
+pub const STREETSTALL_ITEM_BUY_SUCCESS_SIZE: usize = 28;

@@ -1,0 +1,19 @@
+[package]
+name = "ffone-client-foundation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Stable asset, coordinate, and semantic lookup foundation for FFOneClient"
+
+[dependencies]
+bevy.workspace = true
+blake3 = "1.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

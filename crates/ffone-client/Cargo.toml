@@ -1,0 +1,406 @@
+[package]
+name = "ffone-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autoexamples = false
+
+[features]
+# Visual/performance diagnostics are not ordinary example/build prerequisites.
+diagnostics = []
+default = []
+# Development-only Bevy DLL. Release/package commands intentionally do not
+# enable it, so shipped executables stay self-contained.
+dev-dynamic = ["bevy/dynamic_linking"]
+# Opt-in system/render span capture for performance investigations. This is
+# deliberately outside the default and release feature sets: it records the
+# existing frame instead of changing scene content or presentation settings.
+profiling = ["bevy/trace_chrome"]
+
+[dependencies]
+bevy.workspace = true
+# Editor caret/selection geometry uses the same shaper as Bevy text.
+parley = "=0.9.0"
+csv = "~1.3.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+arboard = { version = "3.6.1", default-features = false }
+tempfile = "3"
+blake3 = "1.8"
+ffone-client-foundation = { path = "../ffone-client-foundation" }
+ffone-client-network = { path = "../ffone-client-network" }
+ffone-net = { path = "../ffone-net" }
+ffone-protocol = { path = "../ffone-protocol" }
+ffone-runtime-contracts = { path = "../ffone-runtime-contracts" }
+ffone-skinned-model = { path = "../ffone-skinned-model" }
+ffone-tutorial-core = { path = "../ffone-tutorial-core" }
+ffone-ui-layout = { path = "../ffone-ui-layout" }
+image = { version = "0.25.10", default-features = false, features = ["ico", "png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+rfd = { version = "0.15.4", default-features = false }
+bevy_winit = "=0.19.1"
+winit = "0.30.13"
+winsafe = { version = "0.0.28", features = ["user"] }
+
+[dev-dependencies]
+gltf = { version = "1.4.1", default-features = false, features = ["utils"] }
+tempfile = "3"
+
+[build-dependencies]
+winresource = "0.1"
+
+[lints]
+workspace = true
+
+
+[[test]]
+name = "cashmall_ui_standalone"
+path = "tests/cashmall_ui_standalone/main.rs"
+
+[[test]]
+name = "user_equip_ui_standalone"
+path = "tests/user_equip_ui_standalone/main.rs"
+
+[[test]]
+name = "nanocom_message_ui_standalone"
+path = "tests/nanocom_message_ui_standalone/main.rs"
+
+[[test]]
+name = "character_ui_localization_standalone"
+path = "tests/character_ui_localization_standalone/main.rs"
+
+[[test]]
+name = "enchant_ui_standalone"
+path = "tests/enchant_ui_standalone/main.rs"
+
+[[test]]
+name = "character_selection_ui_standalone"
+path = "tests/character_selection_ui_standalone/main.rs"
+
+[[test]]
+name = "login_ui_localization_standalone"
+path = "tests/login_ui_localization_standalone/main.rs"
+
+[[example]]
+name = "avatar_equipment_gpu_audit"
+path = "examples/characters/avatar_equipment_gpu_audit/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "bank_ui_gpu_preview"
+path = "examples/ui/bank_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "barber_gpu_preview"
+path = "examples/characters/barber_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "buddy_ui_gpu_preview"
+path = "examples/ui/buddy_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "cashmall_ui_gpu_preview"
+path = "examples/ui/cashmall_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "character_creation_gpu_preview"
+path = "examples/characters/character_creation_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "character_creation_ui_gpu_preview"
+path = "examples/ui/character_creation_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "character_selection_gpu_preview"
+path = "examples/characters/character_selection_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "character_selection_portraits_gpu_preview"
+path = "examples/characters/character_selection_portraits_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "coco_effect_gpu_preview"
+path = "examples/effects/coco_effect_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "combi_ui_gpu_preview"
+path = "examples/ui/combi_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "email_ui_gpu_preview"
+path = "examples/ui/email_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "enchant_ui_gpu_preview"
+path = "examples/ui/enchant_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "fusion_portal_gpu_preview"
+path = "examples/effects/fusion_portal_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "game_guide_ui_gpu_preview"
+path = "examples/ui/game_guide_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "gameplay_hud_gpu_preview"
+path = "examples/ui/gameplay_hud_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "glow_energy_gpu_probe"
+path = "examples/effects/glow_energy_gpu_probe/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "group_hud_gpu_preview"
+path = "examples/ui/group_hud_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "guide_ui_gpu_preview"
+path = "examples/ui/guide_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "hnpc_player_gpu_preview"
+path = "examples/world/hnpc_player_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "hnpc_runtime_batch_probe"
+path = "examples/world/hnpc_runtime_batch_probe/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "launcher_ui_gpu_preview"
+path = "examples/ui/launcher_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "logical_model_gpu_preview"
+path = "examples/models/logical_model_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "login_ui_gpu_preview"
+path = "examples/ui/login_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "mission_dialogue_gpu_preview"
+path = "examples/models/mission_dialogue_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "modular_player_gpu_preview"
+path = "examples/characters/modular_player_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "nano_acquisition_client_smoke"
+path = "examples/world/nano_acquisition_client_smoke/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "nano_creation_effect_gpu_preview"
+path = "examples/effects/nano_creation_effect_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "nano_free_tuning_gpu_preview"
+path = "examples/effects/nano_free_tuning_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "nanocom_buddy_gpu_preview"
+path = "examples/models/nanocom_buddy_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "option_ui_gpu_preview"
+path = "examples/ui/option_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "overheat_gpu_preview"
+path = "examples/effects/overheat_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "pc2pc_ui_gpu_preview"
+path = "examples/ui/pc2pc_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "quick_slot_gpu_preview"
+path = "examples/ui/quick_slot_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "quit_menu_gpu_preview"
+path = "examples/ui/quit_menu_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "character_selection_text_gpu_preview"
+path = "examples/ui/character_selection_text_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "race_mode_gpu_preview"
+path = "examples/models/race_mode_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "race_rank_mode_gpu_preview"
+path = "examples/models/race_rank_mode_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "resurrect_ui_gpu_preview"
+path = "examples/ui/resurrect_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "rule_ui_gpu_preview"
+path = "examples/ui/rule_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "semantic_audio_catalog_audit"
+path = "examples/models/semantic_audio_catalog_audit/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "server_selection_ui_gpu_preview"
+path = "examples/ui/server_selection_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "shared_input_gpu_preview"
+path = "examples/ui/shared_input_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "shared_player_rig_gpu_preview"
+path = "examples/characters/shared_player_rig_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "skill_buff_ui_gpu_preview"
+path = "examples/ui/skill_buff_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "system_message_gpu_preview"
+path = "examples/ui/system_message_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "transportation_ui_gpu_preview"
+path = "examples/ui/transportation_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_actor_animation_gpu_preview"
+path = "examples/models/tutorial_actor_animation_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_combat_vfx_gpu_preview"
+path = "examples/effects/tutorial_combat_vfx_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_ep_barrier_gpu_preview"
+path = "examples/effects/tutorial_ep_barrier_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_mission_indicator_gpu_preview"
+path = "examples/models/tutorial_mission_indicator_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_mob_animation_gpu_preview"
+path = "examples/models/tutorial_mob_animation_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_nano_appearance_gpu_preview"
+path = "examples/effects/tutorial_nano_appearance_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_player_rig_gpu_preview"
+path = "examples/characters/tutorial_player_rig_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "tutorial_terrain_gpu_preview"
+path = "examples/models/tutorial_terrain_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "upsell_ui_gpu_preview"
+path = "examples/ui/upsell_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "user_equip_ui_gpu_preview"
+path = "examples/ui/user_equip_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "user_store_ui_gpu_preview"
+path = "examples/ui/user_store_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "vendor_ui_gpu_preview"
+path = "examples/ui/vendor_ui_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "world_capture_gpu_preview"
+path = "examples/world/world_capture_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "world_debug_bot"
+path = "examples/world/world_debug_bot/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "world_map_gpu_preview"
+path = "examples/world/world_map_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "world_nano_summon_gpu_preview"
+path = "examples/world/world_nano_summon_gpu_preview/main.rs"
+required-features = ["diagnostics"]
+
+[[example]]
+name = "world_performance_probe"
+path = "examples/world/world_performance_probe/main.rs"
+required-features = ["diagnostics"]

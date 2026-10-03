@@ -1,0 +1,24 @@
+[package]
+name = "ffone-skinned-model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Native logical-model schema and deterministic GLB 2.0 writer"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "0.10"
+thiserror = "2"
+
+[dev-dependencies]
+gltf = { version = "1.4.1", default-features = false, features = ["KHR_texture_transform", "extras", "names"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[[test]]
+name = "glb"
+path = "tests/glb/main.rs"

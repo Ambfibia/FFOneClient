@@ -1,0 +1,13 @@
+{
+  "destination": [
+    -2933.0,
+    -50.70000076293945,
+    5467.0
+  ],
+  "destinationLoadingObserved": true,
+  "destinationPresentationReadyBeforeLoaderClosed": true,
+  "movementBlockedDuringLoading": true,
+  "offline": true,
+  "productionTeleport": true,
+  "sourcePresentationReady": true
+}

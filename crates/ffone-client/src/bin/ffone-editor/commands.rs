@@ -1,0 +1,30 @@
+use super::*;
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum EditorAction {
+    Tab(CatalogKind),
+    Strings,
+    Xdt,
+    FocusSearch,
+    ClearSearch,
+    CatalogSlot(usize),
+    DefaultPose,
+    TPose,
+    AnimationSlot(usize),
+    AnimationPreviousPage,
+    AnimationNextPage,
+    PreviousClip,
+    NextClip,
+    TogglePlayback,
+    ToggleLoop,
+    SpeedDown,
+    SpeedUp,
+    ResetCamera,
+    ToggleTurntable,
+    ToggleLanguage,
+    ToggleDetails,
+    EquipmentGender(bool),
+    EquipmentCategory(Option<ffone_runtime_contracts::AvatarItemCategory>),
+    ResetOutfit,
+    IconGenerator,
+}

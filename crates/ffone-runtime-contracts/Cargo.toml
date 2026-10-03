@@ -1,0 +1,15 @@
+[package]
+name = "ffone-runtime-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Lightweight serialized runtime contracts shared by FFOne publishers and clients"
+
+[dependencies]
+ffone-skinned-model = { path = "../ffone-skinned-model" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

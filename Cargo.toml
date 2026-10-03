@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+default-members = ["crates/ffone-client"]
+exclude = ["vendor/rodio", "vendor/gilrs-core", "vendor/bevy_gilrs"]
+
+[patch.crates-io]
+rodio = { path = "vendor/rodio" }
+# WGI reads may fail while a controller is being unplugged.
+gilrs-core = { path = "vendor/gilrs-core" }
+bevy_gilrs = { path = "vendor/bevy_gilrs" }
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+
+[workspace.dependencies]
+bevy = "=0.19.1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# Parallelize the large runtime library and both binaries while retaining ThinLTO.
+[profile.release.package.ffone-client]
+codegen-units = 16

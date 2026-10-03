@@ -1,0 +1,18 @@
+[package]
+name = "ffone-ui-editor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "ffone-ui-editor"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "wgpu"] }
+ffone-ui-layout = { path = "../ffone-ui-layout" }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

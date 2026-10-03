@@ -1,0 +1,46 @@
+use super::*;
+
+pub(super) const UNEQUIPPED_PARTS: [(PlayerRigGender, &str, &str, &str, u8); 6] = [
+    (
+        PlayerRigGender::Male,
+        "wear/m_shirt_naked.nif",
+        "m_shirt_naked",
+        "shirt",
+        2,
+    ),
+    (
+        PlayerRigGender::Male,
+        "wear/m_pants_naked.nif",
+        "m_pants_naked",
+        "pants",
+        1,
+    ),
+    (
+        PlayerRigGender::Male,
+        "wear/m_shoes_naked.nif",
+        "m_shoes_naked",
+        "shoes",
+        0,
+    ),
+    (
+        PlayerRigGender::Female,
+        "wear/f_shirt_naked.nif",
+        "f_shirt_naked",
+        "shirt",
+        2,
+    ),
+    (
+        PlayerRigGender::Female,
+        "wear/f_pants_naked.nif",
+        "f_pants_naked",
+        "pants",
+        1,
+    ),
+    (
+        PlayerRigGender::Female,
+        "wear/f_shoes_naked.nif",
+        "f_shoes_naked",
+        "shoes",
+        0,
+    ),
+];

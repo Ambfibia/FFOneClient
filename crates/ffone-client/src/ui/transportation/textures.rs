@@ -1,0 +1,190 @@
+use super::*;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TransportationTextureProof {
+    pub asset_path: &'static str,
+    pub source_path_id: i64,
+    pub width: u32,
+    pub height: u32,
+    pub source_blake3: &'static str,
+}
+
+pub(super) const fn transportation_texture_proof(
+    asset_path: &'static str,
+    source_path_id: i64,
+    width: u32,
+    height: u32,
+    source_blake3: &'static str,
+) -> TransportationTextureProof {
+    TransportationTextureProof {
+        asset_path,
+        source_path_id,
+        width,
+        height,
+        source_blake3,
+    }
+}
+
+pub const TRANSPORTATION_TEXTURE_PROOFS: [TransportationTextureProof; 23] = [
+    transportation_texture_proof(
+        TRANSPORTATION_BLUE_BUTTON_PATH,
+        640,
+        20,
+        25,
+        "2f08cef9a48cdf5a30c20011a2f2baf5239eadf1d87f1c86c1387fa12a5c57c7",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_BLUE_BUTTON_HOVER_PATH,
+        309,
+        20,
+        25,
+        "513b05dd23b32fdecb6f67bb8439afd4616923982902d0036f671ff1bb8c795b",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SCROLL_BAR_PATH,
+        374,
+        18,
+        32,
+        "0afa9c8fffdeec1d82c0f85bfe492aee937428be9a0691d5100521e99a01da80",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SCROLL_DOWN_PATH,
+        415,
+        17,
+        12,
+        "4f8e49b82b462a1b51411ef6af4b4ec21706c0f8fc5252e1bfbe6e16ba5ca00c",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SCROLL_THUMB_PATH,
+        324,
+        13,
+        15,
+        "7681497450d8e9c69d3c21e1df01ae11e6b812da97f2c30e53ad6f360de0cece",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SCROLL_UP_PATH,
+        63,
+        17,
+        12,
+        "aeb7bdf5ae42e3f4c43674a4b96882bba7b91a85313daf100036c1e67842c0ae",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_BUBBLE_PATH,
+        652,
+        198,
+        43,
+        "476306020e5b81eaa73a7c8ba29071aa3fa809d1b1dc645119448e90d7fd566e",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_MONKEY_PATH,
+        213,
+        99,
+        86,
+        "2e41f3074a0c478187e2d18bf97530403fc24b9e91ab016f9bc7dceb2b27923b",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_TAROS_PATH,
+        600,
+        32,
+        32,
+        "cc16bbaed465c824f9c69e77cc910323f0b1472f33333175b6e2e03b24341082",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_FALLBACK_ROUTE_PATH,
+        505,
+        62,
+        61,
+        "c12d52aff5bb3cc1a0d4812acd8cfb8c60d3dfaa3754b51ec44ffd7a65f1ac30",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_REGISTERED_WARP_PATH,
+        196,
+        36,
+        36,
+        "bc1dedd49d22ebd684d07e1f927f3743f37fdd17a7aba8fc9fad3e2e7c723e3f",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_REGISTERED_WYVERN_PATH,
+        296,
+        36,
+        36,
+        "bbbf86e634509d4a4032ade720b6f503cee9d4e73ca436e637418e7572937cfd",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SELECTED_WARP_PATH,
+        291,
+        36,
+        36,
+        "f195c0b832eb86a055ff67da30779d230ee8c1c04b54390ea988064fc5e0476a",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_SELECTED_WYVERN_PATH,
+        237,
+        36,
+        36,
+        "526835b5bdb1140e35f59c657ac7255e4f2938b8187a89663fe1d649e3c8f847",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_START_LABEL_PATH,
+        641,
+        36,
+        36,
+        "2a7b92521d1ef2f62e6c6b5951d6c92eec1d11c6608a51c180f0f167ec3e4dbb",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_UNREGISTERED_WARP_PATH,
+        124,
+        36,
+        36,
+        "43910010fae7986f1f0c2d671ea50c5dfd95c729c9eaab81f34e7f4fb8712d41",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_UNREGISTERED_WYVERN_PATH,
+        589,
+        36,
+        36,
+        "a11d3718ec0b70f6a4bf82fcdfba1538a478f7ecb090a9fb0936237c405dc97b",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_ICON_BOX_PATH,
+        241,
+        16,
+        17,
+        "7b9c60ba220ff10282528400dbea818682fbd8b80b0b384b9b24e70317e6d924",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_LEFT_BACK_PATH,
+        649,
+        100,
+        654,
+        "8be688cc2865772988749360c123ca8cb74ed1f574af3ac7b2c05f644ea2549f",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_LEFT_BOX_PATH,
+        416,
+        344,
+        147,
+        "d6a4aaa025201774d3006b3128a8ea4fa19bbbb7708f0fa5ab5cf0b8f524a4e1",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_RIGHT_BACK_PATH,
+        307,
+        32,
+        654,
+        "a082a0202f8aa85a95cd75232beb5f567786f4837def5b49c6c1047c27d4bb74",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_ROUTE_ROW_PATH,
+        175,
+        70,
+        29,
+        "1e28d3a91d485c6a761a5261b146e79cb8f98516407be2cca70286ad2352e2fd",
+    ),
+    transportation_texture_proof(
+        TRANSPORTATION_ROUTE_SELECTED_PATH,
+        629,
+        35,
+        30,
+        "76e92831398cf7347bd570bec2ed17d6e8b8a7ba855a82c86d96c59d56576b07",
+    ),
+];

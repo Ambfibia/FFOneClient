@@ -1,0 +1,24 @@
+# Scope broad ripgrep searches to maintained implementation and current contracts.
+# For an excluded area use: rg --no-ignore -n <pattern> <exact-file-or-directory>
+# These are search filters, not Git exclusions or build/test exclusions.
+/target/
+/vendor/
+/assets/
+/Cargo.lock
+/recipes/
+/docs/legacy/
+/docs/reference/
+**/fixtures/
+**/tests/
+**/tests.rs
+**/*_tests.rs
+**/test/
+**/test.rs
+**/examples/
+/REFACTOR-NOTES.md
+
+# Generated wire records: enter this directory explicitly for protocol work.
+/crates/ffone-protocol/src/wire_0104/
+/crates/ffone-protocol/src/packet_ids_wire_0104.rs
+
+__pycache__/

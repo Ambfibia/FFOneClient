@@ -1,0 +1,244 @@
+//! Clean-Retrobution `eGameMode.Enchant` contract and standalone Bevy UI.
+//!
+//! The clean `retrobution-20260613` `main.unity3d` / `sharedassets0.assets`
+//! and its matching managed assembly are the parity authority.  In
+//! particular this module follows `cnEnchantMode`, `cnGuiEnchant`,
+//! `InventoryManagerScript`, `EnchantElement`, and the three enchant packet
+//! structs.  Legacy containers are offline evidence only; every runtime image
+//! used here is a validated native PNG below `assets/game`.
+//!
+//! Selection slots are a reversible overlay over authoritative inventory.
+//! The typed wire contracts deliberately do not own a socket, and authoritative
+//! reply mutations are emitted as receipts for the runtime owner to commit.
+//! Legacy-visible mistakes (the inverted helper checks, the armor preview
+//! image typo, the dead cash-item warning branch, and orphaned slots after
+//! `EnchantMoreItem`) are represented explicitly rather than corrected.
+
+use bevy::{
+    asset::LoadState,
+    prelude::*,
+    sprite::BorderRect,
+    text::LineHeight,
+    window::PrimaryWindow,
+};
+use ffone_protocol::{FixedUtf16, FreeChatRequest0104, ItemBase0104, WirePayload};
+use std::{array, collections::VecDeque, error::Error, fmt};
+
+use crate::localization::{LocalizationSet, LocalizedText};
+mod content;
+pub use content::enchant_item_presentation_from_content;
+
+use crate::ui_support::stretched_image as enchant_stretched_image_0104;
+
+use crate::ui_support::sliced_image as enchant_sliced_image_0104;
+
+#[cfg(test)]
+mod localization_tests;
+
+#[cfg(test)]
+mod pointer_release_regression;
+
+mod constants;
+mod containers;
+mod assets;
+mod state_enchant_mode_model0104_phase;
+mod state_enchant_mode_model0104_receive_success;
+mod commands;
+mod interaction;
+mod materials;
+mod codec;
+mod validation;
+mod textures;
+mod layout;
+mod types_enchant_selection0104;
+mod types_enchant_ui_text_style0104;
+mod output;
+mod input;
+mod binding_enchant_ui;
+mod operations_enchant_support_text;
+mod audio;
+mod animation;
+mod models;
+mod view_enchant_main_group;
+mod view_enchant_overlays;
+mod localization_enchant_bind_optional_localized_;
+
+pub use constants::{
+    ENCHANT_SOURCE_BUILD, ENCHANT_SOURCE_MAIN_ARCHIVE, ENCHANT_SOURCE_MAIN_ARCHIVE_SHA256,
+    ENCHANT_SKIN_CUSTOM_STYLE_COUNT, ENCHANT_GUI_MANAGED_SOURCE_SHA256,
+    ENCHANT_SUCCESS_MANAGED_SOURCE_SHA256, ENCHANT_FAILURE_MANAGED_SOURCE_SHA256,
+    ENCHANT_ITEM_BASE_MANAGED_SOURCE_SHA256, ENCHANT_PC_STUFF_MANAGED_SOURCE_SHA256,
+    ENCHANT_EQUIPMENT_PANEL_MANAGED_SOURCE_SHA256, ENCHANT_NPC_TYPE_0104,
+    ENCHANT_POPUP_SOURCE_SLOT_0104, ENCHANT_WAIT_SECONDS_0104,
+    ENCHANT_EQUIPMENT_STRIP_INTERACTIVE_0104, ENCHANT_HELP_ITEM_1_ID_0104,
+    ENCHANT_HELP_ITEM_2_ID_0104, ENCHANT_RECIPE_ROW_COUNT_0104, ENCHANT_REDEEM_WINDOW_ID_0104,
+    ENCHANT_REDEEM_CODE_MAX_CHARS_0104, ENCHANT_REDEEM_CODE_MIN_CHARS_0104,
+    ENCHANT_REDEEM_SHADE_ALPHA_0104, ENCHANT_ITEM_BASE_SIZE_0104,
+    ENCHANT_FAILURE_TARGET_SLOT_OFFSET_0104, ENCHANT_FAILURE_WEAPON_SLOT_OFFSET_0104,
+    ENCHANT_FAILURE_ARMOR_SLOT_OFFSET_0104, ENCHANT_FAILURE_CASH_SLOT_1_OFFSET_0104,
+    ENCHANT_FAILURE_CASH_SLOT_2_OFFSET_0104, ENCHANT_SUCCESS_TARGET_SLOT_OFFSET_0104,
+    ENCHANT_SUCCESS_TARGET_ITEM_OFFSET_0104, ENCHANT_SUCCESS_WEAPON_SLOT_OFFSET_0104,
+    ENCHANT_SUCCESS_WEAPON_ITEM_OFFSET_0104, ENCHANT_SUCCESS_ARMOR_SLOT_OFFSET_0104,
+    ENCHANT_SUCCESS_ARMOR_ITEM_OFFSET_0104, ENCHANT_SUCCESS_CASH_SLOT_1_OFFSET_0104,
+    ENCHANT_SUCCESS_CASH_SLOT_2_OFFSET_0104, ENCHANT_SUCCESS_TAROS_OFFSET_0104,
+    ENCHANT_SUCCESS_FLAG_OFFSET_0104, ENCHANT_MESSAGE_CONFIRM_0104,
+    ENCHANT_MESSAGE_NOT_ENOUGH_TAROS_0104, ENCHANT_MESSAGE_FAILURE_0104,
+    ENCHANT_MESSAGE_DELETE_ITEM_0104, ENCHANT_MESSAGE_DISASSEMBLE_ITEM_0104,
+    ENCHANT_MESSAGE_CONFIRM_TEXT_0104, ENCHANT_MESSAGE_NOT_ENOUGH_TAROS_TEXT_0104,
+    ENCHANT_MESSAGE_FAILURE_TEXT_0104, ENCHANT_RECIPE_TABLE_SHA256,
+    ENCHANT_SOURCE_TEXTURES_0104, ENCHANT_LEGACY_STATES_0104, ENCHANT_FAILURE_ABI_0104,
+    ENCHANT_SUCCESS_ABI_0104, CLEAN_ENCHANT_RECIPES_0104, ENCHANT_EQUIPMENT_SLOT_COUNT_0104,
+    ENCHANT_EQUIPMENT_SLOT_SIZE_0104, ENCHANT_EQUIPMENT_SLOT_STRIDE_0104,
+    ENCHANT_EQUIPMENT_LABELS_0104, ENCHANT_UI_DEFAULT_IMAGE_PATHS_0104
+};
+pub use containers::ENCHANT_SOURCE_SERIALIZED_FILE;
+pub use assets::{
+    ENCHANT_GAME_OBJECT_PATH_ID, ENCHANT_TRANSFORM_PATH_ID,
+    ENCHANT_PC_STUFF_COMPONENT_PATH_ID, ENCHANT_EQUIP_COMPONENT_PATH_ID,
+    ENCHANT_MODE_COMPONENT_PATH_ID, ENCHANT_GUI_COMPONENT_PATH_ID,
+    ENCHANT_PRIMARY_CAMERA_PATH_ID, ENCHANT_PRIMARY_CAMERA_CONTROLLER_PATH_ID,
+    ENCHANT_WAITING_CAMERA_PATH_ID, ENCHANT_WAITING_CAMERA_CONTROLLER_PATH_ID,
+    ENCHANT_SKIN_PATH_ID, ENCHANT_SKIN_FONT_PATH_ID, ENCHANT_PANEL_PATH,
+    ENCHANT_RAW_COVER_PATH, ENCHANT_ITEM_COVER_PATH, ENCHANT_QUANTITY_COVER_PATH,
+    ENCHANT_X_MARK_PATH, ENCHANT_LEVEL_BADGE_PATH, ENCHANT_WAITING_PATH,
+    ENCHANT_WAIT_PROGRESS_PATH, ENCHANT_BLACK_SHADE_PATH, ENCHANT_SUCCESS_PATH,
+    ENCHANT_NPC_ICON_PATH, ENCHANT_BACKDROP_PATH, ENCHANT_RIGHT_PANEL_PATH,
+    ENCHANT_INVENTORY_PANEL_PATH, ENCHANT_SLOT_OCCUPIED_PATH, ENCHANT_SLOT_EMPTY_PATH,
+    ENCHANT_EQUIP_TITLE_PATH, ENCHANT_CLOSE_PATH, ENCHANT_TRASH_PATH, ENCHANT_HELP_PATH,
+    ENCHANT_COMBINED_PATH, ENCHANT_DEXLABS_PATH, ENCHANT_TAROS_COUNTER_PATH,
+    ENCHANT_BOOST_ICON_PATH, ENCHANT_POTION_ICON_PATH, ENCHANT_JEFFE_FONT_PATH,
+    ENCHANT_CHALET_FONT_PATH, ENCHANT_RECIPE_TABLE_PATH, ENCHANT_UI_Z_INDEX_0104,
+    ENCHANT_INVENTORY_SKIN_PATH_ID_0104, ENCHANT_JEFFE_13_FONT_PATH_ID_0104,
+    ENCHANT_CHALET_14_FONT_PATH_ID_0104, ENCHANT_JEFFE_12_FONT_PATH_ID_0104,
+    ENCHANT_CHALET_SMALL_FONT_PATH_ID_0104, ENCHANT_JEFFE_40_FONT_PATH_ID_0104,
+    ENCHANT_JEFFE_08_FONT_PATH_ID_0104, ENCHANT_INVENTORY_SMALL_FONT_PATH_ID_0104,
+    EnchantStaticAssetRole0104, EnchantStaticAssetReadiness0104, EnchantUiAssetStatus0104,
+    enchant_safe_relative_asset_path_0104
+};
+pub use state_enchant_mode_model0104_phase::{
+    ENCHANT_MODE_MANAGED_SOURCE_SHA256, ENCHANT_INVENTORY_MANAGER_MANAGED_SOURCE_SHA256,
+    ENCHANT_GAME_MODE_0104, ENCHANT_INVENTORY_GUI_MODE_0104, EnchantLegacyStateKind0104,
+    enchant_inventory_opening_eased_fraction_0104, EnchantInventoryMutation0104,
+    EnchantSelectionIntent0104, EnchantModeModel0104
+};
+pub use state_enchant_mode_model0104_receive_success::{
+    ENCHANT_INVENTORY_SLOT_COUNT_0104, ENCHANT_INVENTORY_COLUMNS_0104,
+    ENCHANT_INVENTORY_SLOT_SIZE_0104, ENCHANT_INVENTORY_SLOT_STRIDE_0104,
+    ENCHANT_INVENTORY_OPEN_SECONDS_0104, EnchantInventorySlotProjection0104,
+    EnchantModeProjection0104, EnchantInventoryUiState0104
+};
+use state_enchant_mode_model0104_receive_success::advance_enchant_inventory_ui_0104;
+pub use commands::{
+    ENCHANT_REQUEST_MANAGED_SOURCE_SHA256, ENCHANT_DELETE_REQUEST_MANAGED_SOURCE_SHA256,
+    ENCHANT_DISASSEMBLE_REQUEST_MANAGED_SOURCE_SHA256,
+    ENCHANT_REDEEM_REQUEST_MANAGED_SOURCE_SHA256, ENCHANT_POPUP_ACTION_0104,
+    ENCHANT_REQUEST_TARGET_SLOT_OFFSET_0104, ENCHANT_REQUEST_WEAPON_SLOT_OFFSET_0104,
+    ENCHANT_REQUEST_ARMOR_SLOT_OFFSET_0104, ENCHANT_REQUEST_CASH_SLOT_1_OFFSET_0104,
+    ENCHANT_REQUEST_CASH_SLOT_2_OFFSET_0104, ENCHANT_REQUEST_ABI_0104,
+    ENCHANT_DELETE_REQUEST_ABI_0104, ENCHANT_DISASSEMBLE_REQUEST_ABI_0104
+};
+pub use interaction::{
+    ENCHANT_KEYBOARD_CLOSE_REACHABLE_0104, ENCHANT_CONFIGURABLE_SCROLL_REACHABLE_0104,
+    ENCHANT_BUTTON_NORMAL_PATH, ENCHANT_BUTTON_HOVER_PATH,
+    clamp_enchant_inventory_scroll_0104, EnchantInputCapabilities0104,
+    ENCHANT_INVENTORY_SCROLL_VELOCITY_0104, ENCHANT_INVENTORY_SCROLL_MAX_0104,
+    ENCHANT_INVENTORY_BUTTON_FONT_PATH_ID_0104
+};
+use interaction::{
+    EnchantButtonLabel0104, collect_enchant_ui_input_0104, enchant_bind_button_0104,
+    bind_enchant_button_labels_0104
+};
+pub use materials::{ENCHANT_WEAPON_MATERIAL_ID_0104, ENCHANT_ARMOR_MATERIAL_ID_0104};
+use materials::{
+    enchant_material_required_count_0104, enchant_material_id_0104,
+    enchant_material_error_0104
+};
+pub use codec::{
+    ENCHANT_REQUEST_PACKET_ID_0104, ENCHANT_DELETE_REQUEST_PACKET_ID_0104,
+    ENCHANT_DISASSEMBLE_REQUEST_PACKET_ID_0104, ENCHANT_REDEEM_REQUEST_PACKET_ID_0104,
+    ENCHANT_SUCCESS_PACKET_ID_0104, ENCHANT_FAILURE_PACKET_ID_0104,
+    ENCHANT_DELETE_SUCCESS_PACKET_ID_0104, ENCHANT_DISASSEMBLE_SUCCESS_PACKET_ID_0104,
+    ENCHANT_DISASSEMBLE_FAILURE_PACKET_ID_0104, ENCHANT_REQUEST_PACKET_SIZE_0104,
+    ENCHANT_DELETE_REQUEST_PACKET_SIZE_0104, ENCHANT_DISASSEMBLE_REQUEST_PACKET_SIZE_0104,
+    ENCHANT_REDEEM_REQUEST_PACKET_SIZE_0104, ENCHANT_SUCCESS_PACKET_SIZE_0104,
+    ENCHANT_FAILURE_PACKET_SIZE_0104, ENCHANT_RESTRICTED_ITEM_FRAME_PATH,
+    enchant_redeem_wire_0104, EnchantPacketError0104, ENCHANT_EQUIPMENT_WIRE_ORDER_0104
+};
+use codec::exact_packet_size;
+pub use validation::{ENCHANT_FAILURE_ERROR_OFFSET_0104, ENCHANT_REDEEM_SPACE_ERROR_TEXT_0104};
+pub use textures::{EnchantTextureRole0104, EnchantTextureEvidence0104};
+pub use layout::{
+    EnchantUiRect0104, ENCHANT_REFERENCE_WIDTH, ENCHANT_REFERENCE_HEIGHT,
+    ENCHANT_MAIN_GROUP_WIDTH, ENCHANT_MAIN_GROUP_HEIGHT, ENCHANT_RIGHT_BACKPLATE_WIDTH,
+    ENCHANT_PANEL_RECT, ENCHANT_TITLE_RECT, ENCHANT_INTRO_RECT, ENCHANT_PRIMARY_NPC_RECT,
+    ENCHANT_TARGET_TITLE_RECT, ENCHANT_NEEDED_TITLE_RECT, ENCHANT_HELP_TITLE_RECT,
+    ENCHANT_TARGET_SLOT_RECT, ENCHANT_WEAPON_SLOT_RECT, ENCHANT_ARMOR_SLOT_RECT,
+    ENCHANT_HELP_1_SLOT_RECT, ENCHANT_HELP_2_SLOT_RECT, ENCHANT_CHANCE_TITLE_RECT,
+    ENCHANT_CHANCE_RECT, ENCHANT_TAROS_TITLE_RECT, ENCHANT_TAROS_RECT, ENCHANT_PREVIEW_RECT,
+    ENCHANT_CLEAR_RECT, ENCHANT_ACTION_RECT, ENCHANT_RAW_COVER_RECT,
+    ENCHANT_EMPTY_PROMPT_RECT, ENCHANT_WAITING_GROUP_RECT, ENCHANT_WAITING_LABEL_RECT,
+    ENCHANT_WAITING_NPC_RECT, ENCHANT_WAIT_PROGRESS_RECT, ENCHANT_SUCCESS_GROUP_RECT,
+    ENCHANT_SUCCESS_MORE_RECT, ENCHANT_SUCCESS_STUFF_RECT, EnchantModeLayout0104,
+    enchant_mode_layout_0104, enchant_mode_animated_layout_0104, EnchantReplyDisposition0104,
+    ENCHANT_INVENTORY_PANEL_RECT_0104, ENCHANT_INVENTORY_VIEWPORT_RECT_0104,
+    ENCHANT_EQUIPMENT_LOCAL_RECT_0104, ENCHANT_EQUIPMENT_TITLE_RECT_0104,
+    ENCHANT_CLOSE_RECT_0104, ENCHANT_TRASH_RECT_0104, ENCHANT_HELP_RECT_0104,
+    ENCHANT_DEXLABS_RECT_0104, ENCHANT_TAROS_COUNTER_RECT_0104, ENCHANT_REDEEM_CODE_RECT_0104,
+    ENCHANT_TAROS_DIGIT_RECTS_0104, ENCHANT_BATTERY_SLOT_RECTS_0104,
+    ENCHANT_BATTERY_ICON_RECTS_0104, ENCHANT_BATTERY_LABEL_RECTS_0104,
+    ENCHANT_BATTERY_COUNT_RECTS_0104, ENCHANT_TARGET_NAME_RECT_0104,
+    ENCHANT_TARGET_DESCRIPTION_RECT_0104, ENCHANT_TARGET_COMBINED_BADGE_RECT_0104,
+    ENCHANT_TARGET_LEVEL_BADGE_RECT_0104, ENCHANT_WEAPON_NAME_RECT_0104,
+    ENCHANT_WEAPON_DESCRIPTION_RECT_0104, ENCHANT_ARMOR_NAME_RECT_0104,
+    ENCHANT_ARMOR_DESCRIPTION_RECT_0104, ENCHANT_HELP_1_NAME_RECT_0104,
+    ENCHANT_HELP_1_DESCRIPTION_RECT_0104, ENCHANT_HELP_2_NAME_RECT_0104,
+    ENCHANT_HELP_2_DESCRIPTION_RECT_0104, ENCHANT_WEAPON_QUANTITY_COVER_RECT_0104,
+    ENCHANT_ARMOR_QUANTITY_COVER_RECT_0104, ENCHANT_WEAPON_QUANTITY_WARNING_RECT_0104,
+    ENCHANT_ARMOR_QUANTITY_WARNING_RECT_0104, ENCHANT_DEAD_ITEM_COVER_RECT_0104,
+    ENCHANT_DEAD_WARNING_RECT_0104, ENCHANT_SUCCESS_NPC_RECT_0104,
+    ENCHANT_SUCCESS_HOORAY_RECT_0104, ENCHANT_SUCCESS_MESSAGE_RECT_0104,
+    ENCHANT_SUCCESS_ICON_RECT_0104, ENCHANT_SUCCESS_LEVEL_BADGE_RECT_0104,
+    ENCHANT_SUCCESS_NAME_RECT_0104, ENCHANT_SUCCESS_LEVEL_RECT_0104,
+    ENCHANT_SUCCESS_DESCRIPTION_RECT_0104, ENCHANT_BUTTON_BORDER_0104,
+    ENCHANT_INVENTORY_PANEL_BORDER_0104, ENCHANT_RIGHT_PANEL_BORDER_0104
+};
+use layout::enchant_bind_rect_0104;
+pub use types_enchant_selection0104::{
+    EnchantAbiScalar0104, EnchantAbiField0104, EnchantRequest0104, EnchantDeleteRequest0104,
+    EnchantDisassembleRequest0104, EnchantRedeemError0104, EnchantRedeemWire0104,
+    EnchantFailure0104, EnchantSuccess0104, EnchantRecipe0104, EnchantChance0104,
+    EnchantTargetKind0104, EnchantRequirements0104, EnchantProjectionError0104,
+    EnchantItemPresentation0104, EnchantSelectableItem0104, EnchantSupportPresentation0104,
+    EnchantAttachmentSlot0104, EnchantSelection0104, EnchantExternalGates0104,
+    EnchantSystemCallback0104, EnchantPhase0104, EnchantAuthoritativeReceipt0104,
+    EnchantCameraIntent0104, EnchantCameraTarget0104, EnchantLifecycleIntent0104,
+    EnchantPopupIntent0104, EnchantIntent0104, EnchantUiTextStyle0104
+};
+use types_enchant_ui_text_style0104::EnchantUiAssets0104;
+pub use types_enchant_ui_text_style0104::{
+    EnchantSuccessPresentation0104, EnchantUiCommand0104, EnchantUiOutbox0104,
+    EnchantInteractiveControl0104, EnchantUiElement0104, EnchantUiRoot0104, EnchantUiSet0104,
+    EnchantUiPlugin0104
+};
+use output::{write_i32, write_item_base};
+use input::{read_i32, read_item_base};
+pub use binding_enchant_ui::{
+    empty_enchant_item_0104, enchant_requirements_0104, enchant_counter_digit_0104
+};
+use binding_enchant_ui::{
+    enchant_passthrough_text_0104, enchant_cost_text_0104, enchant_quantity_text_0104,
+    enchant_level_badge_text_0104, enchant_counter_digit_text_0104, enchant_battery_count_text_0104,
+    enchant_item_level_text_0104, enchant_stat_value_text_0104, enchant_chance_text_0104,
+    enchant_equipment_slot_text_0104, bind_enchant_ui_0104
+};
+#[cfg(test)]
+use binding_enchant_ui::enchant_bind_dynamic_icon_0104;
+use operations_enchant_support_text::enchant_support_text_0104;
+pub use audio::EnchantAudioIntent0104;
+pub use animation::EnchantAnimationIntent0104;
+pub use models::EnchantModelError0104;
+use view_enchant_main_group::spawn_enchant_ui_0104;
+use view_enchant_overlays::{
+    spawn_enchant_overlays_0104, spawn_enchant_button_0104, spawn_enchant_text_0104
+};
+use localization_enchant_bind_optional_localized_::enchant_bind_optional_localized_text_0104;

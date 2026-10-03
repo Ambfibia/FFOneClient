@@ -1,0 +1,13 @@
+[package]
+name = "ffone-net"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+description = "Blocking OpenFusion network vertical slice for FFOneClient"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+ffone-protocol = { path = "../ffone-protocol" }
+
+[lints.rust]
+unsafe_code = "forbid"

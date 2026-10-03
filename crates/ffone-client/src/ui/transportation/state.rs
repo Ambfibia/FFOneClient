@@ -1,0 +1,6 @@
+
+pub const TRANSPOTATION_GAME_MODE_ID: u8 = 19;
+
+pub const TRANSPORTATION_MODE_NAME: &str = "TransportMode";
+
+pub const TRANSPORTATION_NO_SELECTION_MESSAGE_ID: i32 = 148;

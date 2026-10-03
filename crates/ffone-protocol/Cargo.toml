@@ -1,0 +1,13 @@
+[package]
+name = "ffone-protocol"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+description = "FusionFall beta-20100104 wire protocol primitives for FFOneClient"
+license = "MIT OR Apache-2.0"
+
+[lib]
+path = "src/lib.rs"
+
+[lints.rust]
+unsafe_code = "forbid"

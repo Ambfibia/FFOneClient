@@ -1,0 +1,22 @@
+# Cargo output from the workspace root or a nested crate.
+target/
+# Ad hoc Cargo target directories created with CARGO_TARGET_DIR=target-*.
+/target-*/
+
+# IDE-local configuration.
+/.idea/
+/.vscode/
+
+# Native build and distribution output.
+*.pdb
+/dist/
+
+# Local logs and operating-system metadata.
+*.log
+.DS_Store
+Thumbs.db
+
+# Local environment files may contain credentials.
+.env
+.env.*
+!.env.example

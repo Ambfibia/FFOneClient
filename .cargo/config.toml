@@ -1,0 +1,26 @@
+[alias]
+probe = "run -p ffone-client --features diagnostics --example"
+probe-tests = "test -p ffone-client --features diagnostics --example"
+# Game
+dev = "run --package ffone-client --bin ffone-client"
+release = "build --package ffone-client --bin ffone-client --bin ffone-editor --release"
+
+# Editors
+editor = "run --package ffone-client --bin ffone-editor --"
+ui-editor = "run --package ffone-ui-editor --"
+
+# Workspace verification
+check-all = "check --workspace --all-targets"
+test-all = "test --workspace --all-targets"
+
+
+[build]
+target-dir = "target"
+
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+
+
+[term]
+color = "auto"

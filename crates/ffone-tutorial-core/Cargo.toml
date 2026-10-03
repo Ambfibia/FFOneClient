@@ -1,0 +1,10 @@
+[package]
+name = "ffone-tutorial-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Pure tutorial state and deterministic auxiliary choreography contracts"
+
+[lints]
+workspace = true
