@@ -63,6 +63,7 @@ pub struct TutorialMissionRowProvenance {
     pub title_string_id: i32,
     pub objective_string_id: i32,
     pub mission_type: i32,
+    pub marker_visibility: MissionMarkerVisibility,
     /// XDT `m_iSTNanoID`; `cnMissionJournal` uses this as the Nano table
     /// index for mission type 2.
     pub nano_id: i32,

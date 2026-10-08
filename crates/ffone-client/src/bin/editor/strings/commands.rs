@@ -9,6 +9,7 @@ pub(super) enum Action {
     Filter,
     Edit(String, bool),
     FilterMode,
+    ContextMode(u8),
     ReplaceCase,
     ReplaceWord,
     ReplaceLocale,

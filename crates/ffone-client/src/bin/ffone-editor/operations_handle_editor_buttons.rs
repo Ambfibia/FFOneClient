@@ -72,7 +72,7 @@ pub(super) fn capture_editor_preview(
     let is_equipment = state.kind == CatalogKind::Equipment;
     let ready = if icons.active && !icons.has_subject {
         false
-    } else if state.xdt_open || state.strings_open {
+    } else if state.xdt_open || state.strings_open || state.world_open.is_some() {
         true
     } else if is_equipment {
         matches!(
@@ -197,6 +197,9 @@ pub(super) fn handle_editor_buttons(
     mut orbit: ResMut<OrbitCamera>,
     mut preview: ResMut<ModelPreview>,
     icons: Res<icon_generator::IconGenerator>,
+    mut xdt: ResMut<xdt::XdtEditor>,
+    mut world: ResMut<world_editor::WorldEditor>,
+    mut inspector_scroll:Query<&mut ScrollPosition,With<InspectorScroll>>,
 ) {
     if icons.active { return; }
     for (interaction, action) in &interactions {
@@ -204,17 +207,48 @@ pub(super) fn handle_editor_buttons(
             continue;
         }
         match *action {
+            EditorAction::World2d | EditorAction::World3d => {
+                world.request_open();
+                state.world_open = Some(*action == EditorAction::World3d);
+                state.xdt_open = false;
+                state.strings_open = false;
+                state.missions_open = false;
+                state.search_focused = false;
+            }
+            EditorAction::Missions => {
+                state.world_open = None;
+                state.xdt_open = true;
+                state.strings_open = false;
+                state.missions_open = true;
+                state.search_focused = false;
+                xdt.open_missions();
+            }
             EditorAction::Strings => {
+                state.world_open = None;
+                state.missions_open = false;
                 state.strings_open = true;
                 state.xdt_open = false;
                 state.search_focused = false;
             }
             EditorAction::Xdt => {
+                state.world_open = None;
+                state.missions_open = false;
+                xdt.open_tables();
+                state.xdt_open = true;
+                state.strings_open = false;
+                state.search_focused = false;
+            }
+            EditorAction::NewNpcTemplate => {
+                state.world_open = None;
+                state.missions_open = false;
+                xdt.create_npc_from_catalog();
                 state.xdt_open = true;
                 state.strings_open = false;
                 state.search_focused = false;
             }
             EditorAction::Tab(kind) => {
+                state.world_open = None;
+                state.missions_open = false;
                 state.strings_open = false;
                 state.xdt_open = false;
                 let previous_kind = state.kind;
@@ -234,6 +268,9 @@ pub(super) fn handle_editor_buttons(
                 state.reveal_selection = true;
             }
             EditorAction::ToggleDetails => state.details_open = !state.details_open,
+            EditorAction::NpcInspector(tab) => {
+                if xdt.finish_npc_field(){state.npc_inspector=tab;state.search_focused=false;for mut scroll in &mut inspector_scroll{scroll.0=Vec2::ZERO;}}
+            },
             EditorAction::IconGenerator => {},
             EditorAction::EquipmentGender(_)
             | EditorAction::EquipmentCategory(_)
@@ -244,6 +281,7 @@ pub(super) fn handle_editor_buttons(
                 state.search_focused = true;
             }
             EditorAction::CatalogSlot(index) => {
+                if state.npc_editing()&&!xdt.finish_npc_field(){continue;}
                 if catalog.entries.get(index).is_some() {
                     state.select(&catalog, index);
                     state.search_focused = false;
@@ -299,7 +337,7 @@ pub(super) fn handle_search_keyboard(
     appearance: Res<hnpc::HnpcEditor>,
     icons: Res<icon_generator::IconGenerator>,
 ) {
-    if icons.active || appearance.active() || state.strings_open || state.xdt_open || !state.search_focused {
+    if icons.active || appearance.active() || state.strings_open || state.xdt_open || state.world_open.is_some() || !state.search_focused {
         keys.clear();
         return;
     }
@@ -338,7 +376,7 @@ pub(super) fn handle_editor_shortcuts(
     appearance: Res<hnpc::HnpcEditor>,
     icons: Res<icon_generator::IconGenerator>,
 ) {
-    if icons.active || appearance.active() || state.strings_open || state.xdt_open {
+    if icons.active || appearance.active() || state.strings_open || state.xdt_open || state.world_open.is_some() || state.npc_editing() {
         return;
     }
     let control = keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);

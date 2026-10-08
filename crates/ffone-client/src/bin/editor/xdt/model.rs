@@ -336,13 +336,13 @@ pub(super) fn validate_rows(before: &[Value], after: &[Value]) -> Result<(), Str
             }
         }
     }
-    for row in after.iter().filter_map(Value::as_object) {
-        for (field, value) in row {
+    for row in after {
+        for (field, value) in row.as_object().into_iter().flatten() {
             if let Some(examples) = types.get(field) {
                 if !examples.iter().any(|old| {
                     parse_cell(old, &display(value)).is_ok_and(|parsed| parsed == *value)
                 }) {
-                    return Err(format!("Wrong value type: {field}"));
+                    return Err(schema::task_error(row, format!("Wrong value type: {field}")));
                 }
             }
         }
@@ -374,10 +374,10 @@ pub(super) fn validate_rows(before: &[Value], after: &[Value]) -> Result<(), Str
         for row in after {
             let value = row
                 .get(&field)
-                .ok_or_else(|| format!("Missing identity field: {field}"))?;
-            parse_cell(old[0], &display(value))?;
+                .ok_or_else(|| schema::task_error(row, format!("Missing identity field: {field}")))?;
+            parse_cell(old[0], &display(value)).map_err(|error| schema::task_error(row, error))?;
             if !ids.insert(value.to_string()) {
-                return Err(format!("Duplicate identity: {field} = {value}"));
+                return Err(schema::task_error(row, format!("Duplicate identity: {field} = {value}")));
             }
         }
     }

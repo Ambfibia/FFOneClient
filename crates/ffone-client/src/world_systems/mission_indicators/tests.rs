@@ -12,7 +12,7 @@ fn production_assets() -> AssetLocator {
 
 fn catalog_with_rows(rows: Vec<ClientNpcWaypointRow>) -> ClientNpcWaypointCatalog {
     ClientNpcWaypointCatalog {
-        provenance: expected_provenance(),
+        provenance: None,
         rows: rows.into_boxed_slice(),
     }
 }
@@ -149,11 +149,11 @@ fn consolidated_table(table_set: &Value) -> &Value {
 }
 
 #[test]
-fn production_catalog_validates_primary_identity_and_order() {
+fn production_catalog_preserves_native_identity_and_order() {
     let catalog = ClientNpcWaypointCatalog::open(&production_assets()).unwrap();
 
-    assert_eq!(catalog.rows().len(), CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT);
-    assert_eq!(catalog.provenance(), &expected_provenance());
+    assert!(catalog.rows().len() >= CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT);
+    assert_eq!(catalog.provenance(), None);
     assert_eq!(
         catalog.rows()[0],
         ClientNpcWaypointRow {
@@ -171,6 +171,97 @@ fn production_catalog_validates_primary_identity_and_order() {
         catalog.first_matching_type(2_671).map(|row| row.row_index),
         Some(3)
     );
+}
+
+#[test]
+fn authored_destinations_extend_the_catalog_without_changing_first_match_order() {
+    let locator = production_assets();
+    let mut document: Value = serde_json::from_slice(&locator.read(CLIENT_NPC_WAYPOINT_CATALOG_PATH).unwrap()).unwrap();
+    let count = document["rows"].as_array().unwrap().len();
+    document["rows"].as_array_mut().unwrap().push(serde_json::json!({
+        "npcType": 900001, "clientPosition": [12.5, 2., 25.]
+    }));
+    let catalog = ClientNpcWaypointCatalog::from_json_bytes(&serde_json::to_vec(&document).unwrap()).unwrap();
+    assert_eq!(catalog.first_matching_type(900001).unwrap().client_position, [12.5, 2., 25.]);
+    assert_eq!(catalog.first_matching_type(900001).unwrap().row_index as usize, count);
+    assert_eq!(catalog.first_matching_type(2671).unwrap().row_index, 3);
+    document["rowCount"] = Value::from(count);
+    assert!(ClientNpcWaypointCatalog::from_json_bytes(&serde_json::to_vec(&document).unwrap()).is_err());
+}
+
+fn legacy_waypoint_document() -> Value {
+    serde_json::json!({
+        "schema": LEGACY_CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA,
+        "source": expected_provenance(),
+        "rowCount": 2,
+        "rows": [
+            {"rowIndex": 0, "npcType": 7, "clientPosition": [12.123456789, 2., 25.]},
+            {"rowIndex": 1, "npcType": 7, "clientPosition": [50., 0., 60.]}
+        ]
+    })
+}
+
+#[test]
+fn legacy_catalog_migrates_losslessly_and_keeps_first_matching_destination() {
+    let legacy = legacy_waypoint_document();
+    let before = ClientNpcWaypointCatalog::from_json_bytes(&serde_json::to_vec(&legacy).unwrap()).unwrap();
+    assert_eq!(before.provenance(), Some(&expected_provenance()));
+    let native = ClientNpcWaypointCatalog::into_native_document(legacy.clone()).unwrap();
+    assert_eq!(native["schema"], CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA);
+    assert!(native.get("source").is_none());
+    assert!(native.get("rowCount").is_none());
+    for (old, new) in legacy["rows"].as_array().unwrap().iter().zip(native["rows"].as_array().unwrap()) {
+        assert_eq!(old["npcType"], new["npcType"]);
+        assert_eq!(old["clientPosition"], new["clientPosition"]);
+        assert!(new.get("rowIndex").is_none());
+    }
+    let after = ClientNpcWaypointCatalog::from_json_bytes(&serde_json::to_vec(&native).unwrap()).unwrap();
+    assert_eq!(before.rows(), after.rows());
+    assert_eq!(resolve_client_npc_waypoint_update(Some(7), &before), resolve_client_npc_waypoint_update(Some(7), &after));
+    assert_eq!(after.provenance(), None);
+    assert_eq!(ClientNpcWaypointCatalog::into_native_document(native.clone()).unwrap(), native);
+}
+
+#[test]
+fn legacy_catalog_still_rejects_bad_provenance_counts_and_indices_before_migration() {
+    let original = legacy_waypoint_document();
+    for (pointer, value) in [
+        ("/source/build", Value::from("other-build")),
+        ("/rowCount", Value::from(1)),
+        ("/rows/1/rowIndex", Value::from(0)),
+    ] {
+        let mut invalid = original.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err(), "{pointer}");
+    }
+    for field in ["source", "rowCount"] {
+        let mut invalid = original.clone();
+        invalid.as_object_mut().unwrap().remove(field);
+        assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err(), "{field}");
+    }
+    let mut invalid = original;
+    invalid["rows"][0].as_object_mut().unwrap().remove("rowIndex");
+    assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err());
+}
+
+#[test]
+fn native_catalog_rejects_unknown_fields_schemas_and_non_finite_runtime_coordinates() {
+    let native = ClientNpcWaypointCatalog::into_native_document(legacy_waypoint_document()).unwrap();
+    for (pointer, value) in [
+        ("/schema", Value::from("ffone.client-npc-waypoint-catalog.v99")),
+        ("/rows/0/clientPosition/0", serde_json::json!(1e100)),
+        ("/rows/0/npcType", serde_json::json!(2147483648_u64)),
+    ] {
+        let mut invalid = native.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err(), "{pointer}");
+    }
+    let mut invalid = native.clone();
+    invalid["rows"][0]["rowIndex"] = Value::from(0);
+    assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err());
+    let mut invalid = native;
+    invalid["source"] = serde_json::json!(expected_provenance());
+    assert!(ClientNpcWaypointCatalog::into_native_document(invalid).is_err());
 }
 
 #[test]

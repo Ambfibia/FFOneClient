@@ -372,13 +372,16 @@ pub(super) fn spawn_transportation_control(
     path: &'static str,
     assets: &TransportationPresentationAssets,
 ) {
-    parent.spawn((
+    let mut button = parent.spawn((
         Button,
         TransportationPresentationControlNode(control),
         transportation_node(rect),
         transportation_stretch_image(assets.image(path)),
         ZIndex(7),
     ));
+    if control == TransportationPresentationControl::Close {
+        button.insert(crate::ui::shared::controller::ControllerUiClose);
+    }
 }
 
 pub(super) fn spawn_transportation_text_control(
@@ -449,7 +452,7 @@ pub(super) fn spawn_transportation_route(
         ZIndex(0),
     ));
     if enabled {
-        row.insert(Button);
+        row.insert((Button, crate::ui::shared::controller::ControllerUiDefault));
     } else {
         row.insert(Pickable::IGNORE);
     }

@@ -7,7 +7,7 @@ use ffone_client::{scene_hierarchy, ui_support};
 
 pub use ffone_client::{semantic_audio, ui_startup};
 
-pub use ffone_client::localization;
+pub use ffone_client::{localization, user_settings};
 
 mod world_audio {
     #[derive(bevy::prelude::Resource, Default)]

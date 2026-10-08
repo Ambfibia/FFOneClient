@@ -8,21 +8,55 @@ pub(super) fn text(l: &Localization, lang: &Language, key: &str, fallback: &str)
         &LocalizedText::new(format!("ui.editor.xdt.{key}"), fallback),
     )
 }
+const TASK_CONTEXT: &str = " (mission ID: ";
+
+pub(super) fn task_error(task: &Value, error: impl AsRef<str>) -> String {
+    let error = error.as_ref();
+    let (Some(mission), Some(stage)) = (task["m_iHMissionID"].as_i64(), task["m_iHTaskID"].as_i64()) else {
+        return error.to_owned();
+    };
+    if error.contains(TASK_CONTEXT) { return error.to_owned(); }
+    format!("{error}{TASK_CONTEXT}{mission}, stage ID: {stage})")
+}
+
 pub(super) fn status(status: &str, l: &Localization, lang: &Language) -> String {
+    if let Some((message, context)) = status.rsplit_once(TASK_CONTEXT) {
+        if let Some((mission, stage)) = context.strip_suffix(')').and_then(|s| s.split_once(", stage ID: ")) {
+            if mission.parse::<i64>().is_ok() && stage.parse::<i64>().is_ok() {
+                let context = l.text(lang, &LocalizedText::new("ui.editor.xdt.mission.error_context",
+                    "(mission ID: {mission}, stage ID: {stage})")
+                    .with_arg("mission", mission).with_arg("stage", stage));
+                return format!("{} {context}", self::status(message, l, lang));
+            }
+        }
+    }
     let key = match status {
+        "Working copy saved; not applied to game" => Some("mission.saved_work"),
+        "Working copy restored; not applied to game" => Some("mission.restored_work"),
         "Finish or cancel the new record first" => Some("finish_form"),
+        "Connect a valid main stage chain before changing its boundaries" => Some("mission.error_boundary_chain"),
+        "Select a stage in the main chain or connect it first" => Some("mission.error_boundary_branch"),
         "Missing empty NPC template: Location A256 (1401)" => Some("missing_placeholder_template"),
+        "Selected folder has no readable server xdt.json" => Some("mission.server_missing_xdt"),
+        "Selected xdt.json has no mission table" => Some("mission.server_invalid_xdt"),
         "This parameter is required by the native client" => Some("native_required"),
         "All prerequisite slots are occupied" => Some("mission.error_full_requirements"),
         "Mission prerequisite would create a cycle" => Some("mission.error_dependency_cycle"),
         "Transitions must stay within the same mission" => Some("mission.error_stage_group"),
         "Success transitions cannot create a cycle" | "Success cannot return to the same stage" => Some("mission.error_stage_cycle"),
+        "Saved to client and server; restart the server" => Some("mission.saved_server"),
+        "Saved; server TableData was not found" => Some("mission.saved_client_only"),
+        "Server TableData changed externally; reopen the editor before saving" => Some("mission.server_conflict"),
         _ if status.starts_with("Required parameters:") => Some("check_required"),
         _ if status.starts_with("Duplicate identity:") => Some("duplicate_id"),
         _ => None,
     };
     if let Some(key) = key {
         return text(l, lang, key, status);
+    }
+    if let Some(id) = status.strip_prefix("Mission NPC has no world placement: ") {
+        return l.text(lang, &LocalizedText::new("ui.editor.xdt.mission.missing_placement",
+            "NPC {id} has no placement on the selected server. Place it in the world editor before Rewrite.").with_arg("id", id));
     }
     if let Some((field, reason)) = status.split_once(": ") {
         if field.starts_with("m_") {
@@ -138,6 +172,8 @@ pub(super) fn help(field: &str, l: &Localization, lang: &Language) -> String {
         return text(l, lang, &format!("help.{field}"), help);
     }
     let fallback = match field {
+        "m_iComment" => "Voice type: selects an NPC text record whose m_strComment2 is the audio prefix. Zero disables voice.",
+        "m_strComment2" => "NPC voice prefix used by the published audio catalog.",
         "m_iNpcNumber" => {
             "NPC identity used by missions, spawns and the server. Changing it does not update those references automatically."
         }

@@ -2,7 +2,27 @@
 use super::*;
 
 pub(super) fn command_reply(text: &str) -> Option<LocalizedText> {
+    for (prefix,suffix,key,fallback) in [
+        ("Quest "," started.","ui.chat.command.quest.started","Quest {id} started."),
+        ("Quest "," removed from completed missions.","ui.chat.command.quest.deleted","Quest {id} removed from completed missions."),
+        ("Quest "," is already active.","ui.chat.command.quest.active","Quest {id} is already active."),
+        ("Unknown mission ID: ","","ui.chat.command.quest.unknown","Unknown mission ID: {id}"),
+    ] {
+        if let Some(id)=text.strip_prefix(prefix).and_then(|v|v.strip_suffix(suffix)).filter(|id|id.parse::<i32>().is_ok()) {
+            return Some(LocalizedText::new(key,fallback).with_arg("id",id));
+        }
+    }
+    if let Some(value)=text.strip_prefix("Quest ").and_then(|v|v.split_once(" is completed. Use /deletequest ")) {
+        if value.1==format!("{} first.",value.0) && value.0.parse::<i32>().is_ok() {
+            return Some(LocalizedText::new("ui.chat.command.quest.completed","Quest {id} is completed. Use /deletequest {id} first.").with_arg("id",value.0));
+        }
+    }
     let (key, fallback) = match text {
+        "/startquest: Start a mission by its mission ID" => ("ui.chat.command.help.startquest","/startquest: Start a mission by its mission ID"),
+        "/deletequest: Remove a mission from completed missions" => ("ui.chat.command.help.deletequest","/deletequest: Remove a mission from completed missions"),
+        "Usage: /startquest <mission ID>" => ("ui.chat.command.quest.start_usage","Usage: /startquest <mission ID>"),
+        "Usage: /deletequest <mission ID>" => ("ui.chat.command.quest.delete_usage","Usage: /deletequest <mission ID>"),
+        "The mission needs its escort NPC in the current instance." => ("ui.chat.command.quest.escort","The mission needs its escort NPC in the current instance."),
         "Available commands" => ("ui.chat.command.available", "Available commands"),
         "/redeem: No code specified" => (
             "ui.chat.command.redeem.missing",
@@ -121,7 +141,7 @@ mod tests {
                 checked += 1;
             }
         }
-        assert_eq!(checked, 29);
+        assert_eq!(checked, 31);
         assert!(command_reply("Player says: Available commands").is_none());
     }
 }

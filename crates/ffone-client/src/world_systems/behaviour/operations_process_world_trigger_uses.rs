@@ -591,6 +591,7 @@ pub fn process_world_trigger_uses(
     mut launcher: ResMut<LauncherUiModel>,
     mut launcher_outbox: ResMut<LauncherUiOutbox>,
     mut active_launcher: ResMut<ActiveWorldLauncher>,
+    mut gameplay: ResMut<WorldGameplayIntentQueue>,
 ) {
     for (actor, trigger_entity) in uses.take_all() {
         let Ok((trigger, trigger_global, mut switch_state)) = triggers.get_mut(trigger_entity)
@@ -635,19 +636,18 @@ pub fn process_world_trigger_uses(
                     continue;
                 }
                 controller.begin_scripted_traversal();
+                let native_direction = (end - start).normalize_or_zero();
+                let unity_direction = unity_to_native_vector(native_direction);
+                controller.yaw_degrees = unity_direction.x.atan2(unity_direction.z).to_degrees();
+                let traversal = WorldZiplineTraversal {
+                    start, end, speed, travelled: 0.0, packet_elapsed: 0.0, hang_height: 2.2,
+                };
+                let _ = gameplay.push(packet::P_CL2FE_REQ_PC_ZIPLINE,
+                    &world_zipline_request(&traversal, start, controller.yaw_degrees, false));
                 commands.entity(actor).insert((
-                    WorldZiplineTraversal {
-                        start,
-                        end,
-                        speed,
-                        travelled: 0.0,
-                        packet_elapsed: f32::INFINITY,
-                        // Matches the published player controller/bone span
-                        // already used by the native rope path below.
-                        hang_height: 2.2,
-                    },
+                    traversal,
                     Transform::from_translation(start)
-                        .with_rotation(actor_transform.rotation)
+                        .with_rotation(LegacyUnityHeadingDegrees::new(controller.yaw_degrees).native_root_rotation())
                         .with_scale(actor_transform.scale),
                 ));
             }

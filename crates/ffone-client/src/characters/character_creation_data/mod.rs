@@ -71,7 +71,7 @@ use validation::validate_documents;
 pub use types::{
     CharacterCreationDataResult, CharacterCreationData, CharacterCreationDataResource
 };
-use types::LegacyHatPolicy;
+pub use types::LegacyHatPolicy;
 pub use state::ResolvedCreatorSelection;
 use textures::{
     PartTextureRule, compatible_shared_texture_contract, validate_runtime_texture_contract

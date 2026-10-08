@@ -9,12 +9,14 @@ pub(super) enum Channel {
     Journal,
     Message,
     Bubble,
+    Email,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Phase {
     Start,
     Complete,
     Failure,
+    Available,
 }
 #[derive(Clone, Debug)]
 pub(super) struct Event {
@@ -23,6 +25,7 @@ pub(super) struct Event {
     pub phase: Phase,
     pub id: i64,
     pub npc: i64,
+    pub slot:Option<usize>,
 }
 pub(super) fn events(row: &Value) -> Vec<Event> {
     let mut result = Vec::new();
@@ -64,8 +67,24 @@ pub(super) fn events(row: &Value) -> Vec<Event> {
                     phase,
                     id,
                     npc: row[npc_field].as_i64().unwrap_or(0),
+                    slot:None,
                 });
             }
+        }
+    }
+    for (phase,field,route,speaker) in [(Phase::Start,"m_iSTMessageTextID","m_iSTMessageType","m_iSTMessageSendNPC"),(Phase::Complete,"m_iSUMessagetextID","m_iSUMessageType","m_iSUMessageSendNPC"),(Phase::Failure,"m_iFMessageTextID","m_iFMessageType","m_iFMessageSendNPC")] {
+        let flags=row[route].as_i64().unwrap_or(0);
+        if row[route].as_i64().is_some() && flags & 2 == 0 {result.retain(|e|!(e.field==field && e.channel==Channel::Message));}
+        if flags & 4 != 0 {
+            let separate=mail_fields::email_field(row,field);
+            let field=if row[separate].as_i64().is_some_and(|id|id>0){separate}else{field};
+            let npc=mission_events::speaker(field).and_then(|key|row[key].as_i64()).filter(|id|*id>0).unwrap_or_else(||row[speaker].as_i64().unwrap_or(0));
+            if let Some(id)=row[field].as_i64().filter(|id|*id>0) {result.push(Event{field,channel:Channel::Email,phase,id,npc,slot:None});}
+        }
+    }
+    for (slot,npc) in [707,728,731,732,730].into_iter().enumerate() {
+        if let Some(id)=row["m_iMentorEmailID"].get(slot).and_then(Value::as_i64).filter(|id|*id>0) {
+            result.push(Event{field:"m_iMentorEmailID",channel:Channel::Email,phase:Phase::Available,id,npc,slot:Some(slot)});
         }
     }
     result
@@ -377,10 +396,12 @@ pub(super) fn event_heading(l: &Localization, lang: &Language, event: &Event) ->
     let (kind, caption) = match event.channel {
         Channel::Journal => ("journal", "Journal"),
         Channel::Message => ("message", "NanoCom"),
+        Channel::Email => ("email", "Email"),
         Channel::Bubble => ("bubble", "Overhead speech"),
     };
     let (phase, when) = match event.phase {
         Phase::Start => ("start", "At start"),
+        Phase::Available => ("available", "When available"),
         Phase::Complete => ("complete", "After completion"),
         Phase::Failure => ("failure", "On failure"),
     };

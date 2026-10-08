@@ -1,5 +1,41 @@
 use super::*;
 
+#[test]
+fn academy_equipment_materials_load_complete_shared_texture_chains() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
+    let avatar: Value = serde_json::from_slice(&std::fs::read(root.join("data/character_creation/avatar_items.json")).unwrap()).unwrap();
+    let first = std::collections::BTreeMap::from([
+        ("back",174), ("glasses",123), ("hat",368), ("shirt",668),
+        ("pants",563), ("shoes",564), ("vehicle",137), ("weapon",768),
+    ]);
+    let mut paths = std::collections::BTreeSet::new();
+    for item in avatar["items"].as_array().unwrap() {
+        let Some(minimum) = first.get(item["category"].as_str().unwrap()) else {continue;};
+        if item["itemNumber"].as_u64().unwrap() < *minimum {continue;}
+        for gender in ["male", "female"] {
+            for model in item[gender]["models"].as_array().into_iter().flatten() {
+                paths.insert(model["nativeAsset"]["path"].as_str().unwrap().to_owned());
+            }
+        }
+    }
+    assert!(!paths.is_empty());
+    for route in paths {
+        let path=root.join(&route);
+        let bytes=std::fs::read(&path).unwrap();
+        let length=u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
+        let model:Value=serde_json::from_slice(&bytes[20..20+length]).unwrap();
+        for material in model["materials"].as_array().unwrap() {
+            let pending=PendingLegacyModelMaterial::from_gltf_extras(material["name"].as_str(),&material["extras"].to_string())
+                .unwrap_or_else(|error|panic!("{route}: {error}"));
+            for binding in pending.texture_bindings {
+                for level in binding.mip_levels.into_iter().flatten() {
+                    assert!(path.parent().unwrap().join(&level.uri).is_file(), "{route}: missing {}",level.uri);
+                }
+            }
+        }
+    }
+}
+
 pub(super) fn production_model_pending(
     relative_glb_path: &str,
     exact_material_name: &str,
@@ -41,10 +77,34 @@ fn mesh_extras_preserve_exact_legacy_renderer_order() {
 }
 
 #[test]
+fn relocated_chef_materials_reuse_base_mandroid_textures() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
+    let path = root.join("characters/npcs/npc_mandroid_chef/npc_mandroid_chef.glb");
+    let bytes = std::fs::read(&path).unwrap();
+    let length = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
+    let model: Value = serde_json::from_slice(&bytes[20..20 + length]).unwrap();
+    let mut reused_body = false;
+    for material in model["materials"].as_array().unwrap() {
+        let pending = PendingLegacyModelMaterial::from_gltf_extras(
+            material["name"].as_str(),
+            &serde_json::to_string(&material["extras"]).unwrap(),
+        )
+        .expect("relocated Chef material must pass the runtime URI contract");
+        for binding in &pending.texture_bindings {
+            if let Some(uri) = &binding.uri {
+                assert!(path.parent().unwrap().join(uri).is_file(), "{uri}");
+                reused_body |= uri == "../npc_mandroid1/npc_mandroid1.textures/npc_mandroid1.png";
+            }
+        }
+    }
+    assert!(reused_body, "Chef must share the original Mandroid body texture");
+}
+
+#[test]
 fn production_fusion_kimchi_uses_original_atlas_and_complete_kimchi_mesh() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
     let bytes =
-        std::fs::read(root.join("characters/npcs/fusion_kimchi/fusion_kimchi.glb")).unwrap();
+        std::fs::read(root.join("characters/fusions/fusion_kimchi/fusion_kimchi.glb")).unwrap();
     let length = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
     let model: Value = serde_json::from_slice(&bytes[20..20 + length]).unwrap();
     // Fusion Kimchi uses its own original atlas on the complete Kimchi mesh.
@@ -106,7 +166,7 @@ fn production_fusion_kimchi_uses_original_atlas_and_complete_kimchi_mesh() {
         .unwrap();
     assert_eq!(
         texture["path"],
-        "characters/npcs/fusion_kimchi/textures/fusion_kimchi.png"
+        "characters/fusions/fusion_kimchi/textures/fusion_kimchi.png"
     );
     assert_eq!(
         texture["sha256"],

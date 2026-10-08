@@ -55,7 +55,7 @@ pub(super) fn spawn_label(
         assets,
         LoginTextStyle0104::Label,
         Color::WHITE,
-        (),
+        account_view::CredentialLabel,
     );
 }
 
@@ -119,6 +119,10 @@ pub(super) fn spawn_input(
 
 pub(super) fn spawn_login_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     let assets = LoginUiAssets {
+        check_empty: asset_server.load("ui/en/option/radio-empty.png"),
+        check_checked: asset_server.load("ui/en/option/radio-checked.png"),
+        scroll_track: asset_server.load("ui/en/user-equip/scroll-track.png"),
+        scroll_thumb: asset_server.load("ui/en/user-equip/scroll-thumb.png"),
         background: asset_server.load(LOGIN_BACKGROUND_PATH),
         fallback_background: asset_server.load(LOGIN_FALLBACK_BACKGROUND_PATH),
         panel: asset_server.load(LOGIN_PANEL_PATH),
@@ -156,6 +160,7 @@ pub(super) fn spawn_login_ui(mut commands: Commands, asset_server: Res<AssetServ
             LoginRoot,
         ))
         .with_children(|root| {
+            browser_view::spawn(root, &assets);
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -209,6 +214,7 @@ pub(super) fn spawn_login_ui(mut commands: Commands, asset_server: Res<AssetServ
                 LoginPanel,
             ))
             .with_children(|panel| {
+                account_view::spawn(panel);
                 spawn_label(
                     panel,
                     "ui.login.username",

@@ -27,9 +27,11 @@ pub(super) fn prepare_tutorial_nano_gameplay_asset(
         && let (Some(locator), Some(presentation)) =
             (locator.as_deref(), state.world_presentation.as_ref())
     {
-        let sound_events = match locator
-            .read(&presentation.model_path)
-            .and_then(|bytes| parse_network_npc_animation_sound_events(&bytes))
+        let parsed = locator.read(&presentation.model_path).and_then(|bytes| {
+            Ok((parse_network_npc_animation_sound_events(&bytes)?,
+                corruption::particle_events(&bytes)?))
+        });
+        let (sound_events, corruption_events) = match parsed
         {
             Ok(events) => events,
             Err(error) => {
@@ -40,6 +42,7 @@ pub(super) fn prepare_tutorial_nano_gameplay_asset(
             }
         };
         assets.sound_events = Some(sound_events.into());
+        assets.corruption_events = corruption_events;
     }
     let skill_clip = state
         .world_presentation
@@ -86,7 +89,7 @@ pub(super) fn prepare_tutorial_nano_gameplay_asset(
                     .map(|clip| (*logical_name, clip.clone()))
             })
             .collect::<Vec<_>>();
-        for name in ["withdraw", "discharge"] {
+        for name in ["withdraw", "discharge", "win", "lose", "tie"] {
             if let Some(clip) = gltf.named_animations.get(name) {
                 available_clips.push((name, clip.clone()));
             }

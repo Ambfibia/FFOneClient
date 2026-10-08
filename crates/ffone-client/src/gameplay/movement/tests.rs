@@ -5,6 +5,30 @@ use bevy::time::TimeUpdateStrategy;
 use crate::movement::*;
 
 #[test]
+fn cannon_flight_ignores_walking_jump_and_camera_yaw_and_suppresses_jump_packets() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins)
+        .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(1.0 / 60.0)))
+        .insert_resource(LegacyInputState { local_axis: Vec2::ONE, jump_just_pressed: true, ..default() })
+        .init_resource::<MovementIntentQueue>()
+        .add_systems(Update, simulate_legacy_players);
+    app.update();
+    let mut controller = LegacyPlayerController::from_baseline_table();
+    controller.yaw_degrees = 57.0;
+    controller.launch_scripted_ballistic(Vec3::new(-20.0,30.0,10.0));
+    let entity = app.world_mut().spawn((Transform::from_xyz(0.0,100.0,0.0),controller)).id();
+    app.world_mut().spawn(LegacyOrbitCamera::new(entity).with_yaw(210.0));
+    for _ in 0..30 { app.update(); }
+    let controller = app.world().get::<LegacyPlayerController>(entity).unwrap();
+    assert!(controller.launcher_active());
+    assert_eq!(controller.yaw_degrees,57.0);
+    assert_eq!(controller.velocity.x,-20.0);
+    assert_eq!(controller.velocity.z,10.0);
+    assert!(controller.velocity.y<30.0);
+    assert!(app.world_mut().resource_mut::<MovementIntentQueue>().pop_front().is_none());
+}
+
+#[test]
 fn vehicle_acceleration_coasting_and_dismount_preserve_momentum_contract() {
     let mut controller = LegacyPlayerController::from_server_attributes(600, 568);
     controller.set_vehicle_speed(Some(1100));
@@ -895,6 +919,20 @@ fn landing_forces_a_packet_only_for_an_active_jump_state() {
     assert!(jump.grounded);
     assert!(!jump.jumping);
     assert_eq!(jump.vertical_velocity, 0.0);
+}
+
+#[test]
+fn traversal_zero_jump_blocks_midair_space_and_clears_old_surface_state() {
+    let mut controller = LegacyPlayerController::from_baseline_table();
+    controller.start_normal_jump(8.0);
+    controller.surface_sliding = true;
+    controller.begin_scripted_traversal();
+    controller.finish_scripted_traversal_with_jump();
+    assert!(controller.jumping);
+    assert!(!controller.surface_sliding);
+    assert_eq!(controller.jump_packet_velocity, 8.0, "Jump(0) retains the last positive jumpVelocity");
+    controller.step_normal_vertical(true, 1.0 / 60.0);
+    assert!(controller.vertical_velocity < 0.0, "Space must not launch again after detachment");
 }
 
 #[test]

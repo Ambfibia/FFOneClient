@@ -110,6 +110,50 @@ fn shared_text_editor() -> (tempfile::TempDir, XdtEditor) {
 }
 
 #[test]
+fn world_map_icons_follow_npc_ids_and_unsaved_xdt_edits() {
+    let (_dir, mut e) = shared_text_editor();
+    let pointer = e.tables[e.table].pointer.clone();
+    let rows = e.document.pointer_mut(&pointer).unwrap().as_array_mut().unwrap();
+    rows[0]["m_iMapIcon"] = json!(18);
+    rows[1]["m_iMapIcon"] = json!(20);
+    e.base = e.document.clone();
+    assert_eq!(e.npc_map_icons(), BTreeMap::from([(17, 18), (18, 20)]));
+    e.begin(Focus::Cell("m_iMapIcon".into()));
+    e.replace("22");
+    assert!(e.apply());
+    assert_eq!(e.npc_map_icons()[&17], 22);
+    assert!(e.dirty());
+    e.undo(false);
+    assert_eq!(e.npc_map_icons()[&17], 18);
+    assert!(!e.dirty());
+}
+
+#[test]
+fn object_npc_marker_types_resolve_raw_meshes_even_for_invisible_npcs() {
+    let (_dir, mut e) = shared_text_editor();
+    let table = &mut e.document["tables"][0]["value"]["m_pNpcTable"];
+    table["m_pNpcMeshData"] = json!([
+        {"m_pstrMMeshModelString":"ObjectNPC1"},
+        {"m_pstrMMeshModelString":"dexter"}
+    ]);
+    table["m_pNpcData"][0]["m_iMesh"] = json!(0);
+    table["m_pNpcData"][0]["m_iNpcType"] = json!(100);
+    table["m_pNpcData"][1]["m_iMesh"] = json!(1);
+    e.base = e.document.clone();
+    e.discover();
+    assert_eq!(e.object_npc_types(), BTreeSet::from([17]));
+    let npc = e.tables.iter().position(|t| t.label.ends_with("/m_pNpcData")).unwrap();
+    e.select_table(npc);
+    e.row = Some(0);
+    let mut rows = e.rows().to_vec();
+    rows[0]["m_iMesh"] = json!(1);
+    e.change(rows).unwrap();
+    assert!(e.object_npc_types().is_empty());
+    e.undo(false);
+    assert_eq!(e.object_npc_types(), BTreeSet::from([17]));
+}
+
+#[test]
 fn new_mission_allocates_group_identity_and_new_stage_keeps_existing_group_and_name() {
     let (_dir, mut e) = production_editor("m_pMissionTable/m_pMissionData");
     let before = e.document.clone();
@@ -179,7 +223,7 @@ fn private_text_copy_preserves_metadata_and_other_owners_and_undoes_atomically()
     e.undo(false);
     assert_eq!(e.document, original);
     e.undo(true);
-    e.save().unwrap();
+    e.rewrite().unwrap();
     assert_eq!(read(&e.path).unwrap(), e.document);
     e.select_table(owner_table);
     e.row = Some(0);
@@ -251,7 +295,7 @@ fn list_element_edit_and_reference_pick_preserve_shape_and_unselected_slots() {
     assert_eq!(e.rows()[0]["counts"], json!([1, 2, 3]));
 }
 
-fn production_editor(table: &str) -> (tempfile::TempDir, XdtEditor) {
+pub(super) fn production_editor(table: &str) -> (tempfile::TempDir, XdtEditor) {
     let directory = tempfile::tempdir().unwrap();
     fs::create_dir_all(directory.path().join("data/tables")).unwrap();
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
@@ -325,7 +369,7 @@ fn inline_name_and_owner_are_one_atomic_undo_step_and_cancel_is_lossless() {
     assert_eq!(e.document, before);
     e.undo(true);
     assert_eq!(e.record_name(e.table, e.rows().len() - 1), "Новый персонаж");
-    e.save().unwrap();
+    e.rewrite().unwrap();
     assert_eq!(read(&e.path).unwrap(), e.document);
     e.start_draft(false).unwrap();
     e.draft = None;
@@ -433,7 +477,7 @@ fn lossless_edit_add_undo_and_atomic_save() {
     assert_eq!(e.rows().len(), 1);
     e.undo(true);
     assert_eq!(e.rows().len(), 2);
-    e.save().unwrap();
+    e.rewrite().unwrap();
     let disk = read(&e.path).unwrap();
     let published: Value = serde_json::from_slice(&fs::read(&e.path).unwrap()).unwrap();
     assert!(published.get("tables").is_none());
@@ -462,10 +506,10 @@ fn conflicting_save_leaves_disk_and_draft_intact() {
     assert!(e.apply());
     let disk = document(json!([{"m_iID":1,"name":"external"}]));
     fs::write(&e.path, disk.to_string()).unwrap();
-    assert!(e.save().unwrap_err().contains("conflict"));
+    assert!(e.rewrite().unwrap_err().contains("conflict"));
     assert_eq!(read(&e.path).unwrap(), disk);
     assert_eq!(e.rows()[0]["name"], "draft");
-    assert!(e.dirty());
+    assert!(e.unpublished());
 }
 #[test]
 fn unrelated_external_fields_merge_without_loss() {

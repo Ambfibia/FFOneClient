@@ -60,6 +60,9 @@ pub(super) fn draw(
                             item(p, f, Command::NewStage, "mission.create_element", "Create new stage");
                         }
                         item(p, f, Command::Center, "mission.center", "Center selection");
+                        if e.graph_stages {
+                            if let Some(row) = e.mission_row() { event_items(p, f, row); }
+                        }
                     }
                     Context::Node(row) => {
                         caption(p, f, format!("ID: {}", e.rows().get(*row).map(|v| display(&v["m_iHTaskID"])).unwrap_or_default()), 12., MUTED);
@@ -69,9 +72,23 @@ pub(super) fn draw(
                         } else {
                             item(p, f, Command::NewStage, "mission.add_stage", "+ Stage");
                             item(p, f, Command::Duplicate, "duplicate", "Duplicate");
+                            item(p, f, Command::FirstStage(*row), "mission.make_first", "Make first stage");
+                            item(p, f, Command::ChooseStagePosition(*row), "mission.stage_position", "Choose stage number…");
+                            item(p, f, Command::LastStage(*row), "mission.make_last", "Make last stage");
+                            item(p,f,Command::EditObjective(*row),"mission.edit_objective","Edit objective title");
+                            event_items(p, f, *row);
                             item(p, f, Command::CopyId, "mission.copy_id", "Copy ID");
                             item(p, f, Command::Delete, "delete", "Delete");
                         }
+                    }
+                    Context::StagePosition(row) => {
+                        let mission=e.rows()[*row]["m_iHMissionID"].clone();
+                        let count=e.rows().iter().filter(|r|r["m_iHMissionID"]==mission).count();
+                        p.spawn((ScrollRegion(4),Node{max_height:px(400),overflow:Overflow::scroll_y(),flex_direction:FlexDirection::Column,..default()})).with_children(|p|{
+                            for position in 0..count {
+                                view::dynamic_button(p,f,Action::Mission(Command::StagePosition(*row,position)),format!("{} {}",presentation::tr(l,lang,"mission.stage_number","Stage"),position+1),false,0.);
+                            }
+                        });
                     }
                     Context::Mission(row) => {
                         let id = e.rows().get(*row).map(|v| display(&v["m_iHMissionID"])).unwrap_or_default();
@@ -104,6 +121,19 @@ pub(super) fn draw(
             }
         });
     });
+}
+
+fn event_items(p: &mut ChildSpawnerCommands, f: &EditorFonts, row: usize) {
+    for (field, key, text) in [
+        ("m_iSTMessageTextID", "mission.nanocom_start", "NanoCom - start"),
+        ("m_iSUMessagetextID", "mission.nanocom_end", "NanoCom - end"),
+        ("m_iSTDialogBubble", "mission.dialog_start", "Dialogue - start"),
+        ("m_iSUDialogBubble", "mission.dialog_end", "Dialogue - end"),
+    ] { item(p, f, Command::EditEvent(row, field.into()), key, text); }
+    item(p,f,Command::EditEmail(row,"m_iSTMessageTextID".into(),None),"mission.email_start","Email · mission start");
+    for (slot,key,text) in [(0,"edd","Email · available · Edd"),(1,"dexter","Email · available · Dexter"),(2,"mojo","Email · available · Mojo"),(3,"ben","Email · available · Ben"),(4,"computress","Email · available · Computress")] {
+        item(p,f,Command::EditEmail(row,"m_iMentorEmailID".into(),Some(slot)),&format!("mission.email_{key}"),text);
+    }
 }
 
 fn caption(

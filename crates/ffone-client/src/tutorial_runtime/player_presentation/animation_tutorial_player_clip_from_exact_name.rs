@@ -26,6 +26,7 @@ impl TutorialPlayerClip {
             "death" => Some(Self::Death),
             "slide" => Some(Self::Slide),
             "ropedown" => Some(Self::RopeDown),
+            "luncher" => Some(Self::Launcher),
             "ropedrop" => Some(Self::RopeDrop),
             "ropeleft" => Some(Self::RopeLeft),
             "roperight" => Some(Self::RopeRight),
@@ -407,6 +408,7 @@ impl TutorialPlayerAnimationRequest {
                 | TutorialPlayerClip::JumpEnd
                 | TutorialPlayerClip::JumpLandRun
                 | TutorialPlayerClip::Slide
+                | TutorialPlayerClip::Launcher
                 | TutorialPlayerClip::RopeDown
                 | TutorialPlayerClip::RopeDrop
                 | TutorialPlayerClip::RopeLeft
@@ -496,7 +498,8 @@ impl TutorialPlayerAnimationRequest {
             hide_hand_attachment: matches!(
                 clip,
                 TutorialPlayerClip::Slide
-                    | TutorialPlayerClip::RopeDown
+                    | TutorialPlayerClip::Launcher
+                | TutorialPlayerClip::RopeDown
                     | TutorialPlayerClip::RopeDrop
                     | TutorialPlayerClip::RopeLeft
                     | TutorialPlayerClip::RopeRight
@@ -554,7 +557,8 @@ impl TutorialPlayerAnimationRequest {
             hide_hand_attachment: matches!(
                 clip,
                 TutorialPlayerClip::Slide
-                    | TutorialPlayerClip::RopeDown
+                    | TutorialPlayerClip::Launcher
+                | TutorialPlayerClip::RopeDown
                     | TutorialPlayerClip::RopeDrop
                     | TutorialPlayerClip::RopeLeft
                     | TutorialPlayerClip::RopeRight

@@ -1,6 +1,14 @@
 use super::*;
 
 pub(in super::super) fn install(app: &mut App) {
+    if let Some(output) = env::var_os("FFONE_CIVILIAN_ROUTES_PROBE_OUTPUT") {
+        civilian_routes_network::install(app, PathBuf::from(output));
+        return;
+    }
+    if let Some(output) = env::var_os("FFONE_NPC_SKILL_NETWORK_PROBE_OUTPUT") {
+        npc_skill_network::install(app, PathBuf::from(output));
+        return;
+    }
     if let Some(output) = env::var_os("FFONE_CHARACTER_SESSION_PROBE_OUTPUT") {
         character_session_network::install(app, PathBuf::from(output));
         return;
@@ -30,6 +38,7 @@ pub(in super::super) fn install(app: &mut App) {
     };
     if env::var_os("FFONE_PERF_CHAT_COMMANDS").is_some() { chat_commands::install(app); }
     visual_effects::install(app);
+    if env::var_os("FFONE_PERF_TRAVERSAL").is_some() { traversal::install(app); }
     if env::var_os("FFONE_PERF_NPC_INTERACTION_RANGE").is_some() { npc_interaction_range::install(app); }
     if env::var_os("FFONE_PERF_NPC_BUBBLE_VISIBILITY").is_some() { npc_bubble_visibility::install(app); }
     if env::var_os("FFONE_PERF_INVENTORY_AVAILABILITY").is_some() {

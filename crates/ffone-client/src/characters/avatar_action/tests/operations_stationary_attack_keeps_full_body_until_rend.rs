@@ -96,6 +96,32 @@ fn damage_interrupts_attack_and_repeated_hits_advance_generation() {
 }
 
 #[test]
+fn cannon_pose_preempts_both_attack_layers_with_immediate_source_play() {
+    let mut app = App::new();
+    app.init_resource::<Time>().init_resource::<LegacyVisualRequestQueue>()
+        .add_systems(Update, update_legacy_avatar_locomotion);
+    let mut controller = LegacyPlayerController::from_baseline_table();
+    controller.launch_scripted_ballistic(Vec3::new(20.0,30.0,0.0));
+    let actor = app.world_mut().spawn((controller, LegacyAvatarActionContext::default(),
+        LegacyAvatarPresentationContext { traversal: LegacyAvatarTraversalPresentation::Launcher, ..default() },
+        LegacyAvatarClipBindings::default(), LegacyAvatarActionState {
+            upper_action: Some(LegacyVisualClip::AttackUpper(1)),
+            base_action: Some(LegacyVisualClip::AttackFull(1)),
+            attack_delay_remaining: Some(0.2), visual_initialized: true, ..default()
+        })).id();
+    app.update();
+    let state = app.world().get::<LegacyAvatarActionState>(actor).unwrap();
+    assert_eq!(state.locomotion, LegacyLocomotionState::Launcher);
+    assert_eq!(state.upper_action, None); assert_eq!(state.base_action(), None);
+    assert_eq!(state.attack_delay_remaining, None);
+    assert_eq!(state.attack_generation(),1);
+    let requests = app.world_mut().resource_mut::<LegacyVisualRequestQueue>().take_all();
+    assert!(matches!(requests[0].command, LegacyVisualCommand::CrossFade {
+        requested_clip: LegacyVisualClip::Launcher, blend_seconds: 0.0, ..
+    }));
+}
+
+#[test]
 fn nano_dash_and_stun_preempt_locomotion_and_release_without_retriggering() {
     let mut app=App::new();
     app.init_resource::<LegacyVisualRequestQueue>().add_systems(Update, update_legacy_avatar_locomotion);

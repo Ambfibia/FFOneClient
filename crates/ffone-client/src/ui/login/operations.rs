@@ -19,7 +19,8 @@ pub(super) fn queue_login(model: &mut LoginUiModel, outbox: &mut LoginUiOutbox) 
         .trim()
         .to_owned();
     model.password = model.password.trim().to_owned();
-    if model.username.is_empty() || model.password.is_empty() {
+    if model.username.is_empty() || (model.password.is_empty()
+        && model.saved_account.as_deref() != Some(model.username.as_str())) {
         // `CnLoginMode.SendLogin` simply releases `bButtonLogin` in this branch.
         model.busy = false;
         model.status.clear();

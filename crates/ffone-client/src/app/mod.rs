@@ -820,6 +820,7 @@ use world_nano::{
     apply_world_nano_authority_inbox, apply_world_nano_response_frame,
     apply_world_npc_skill_response_frame, reset_world_nano_and_mission_presentation,
     sync_world_nano_presentation,
+    recall_world_nano_for_zipline,
 };
 use world_npc_interaction::{
     bank_service_kind, collect_world_npc_interactions, combi_service_allowed_0104,

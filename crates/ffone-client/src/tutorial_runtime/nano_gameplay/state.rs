@@ -134,6 +134,9 @@ impl TutorialNanoGameplayState {
             "skill1" => LegacyNanoAnimationMode::Skill1,
             "skill2" => LegacyNanoAnimationMode::Skill2,
             "skill3" => LegacyNanoAnimationMode::Skill3,
+            "win" => LegacyNanoAnimationMode::Win,
+            "lose" => LegacyNanoAnimationMode::Lose,
+            "tie" => LegacyNanoAnimationMode::Tie,
             "stand1" | "stand2" | "stand3" => LegacyNanoAnimationMode::Stand,
             _ => LegacyNanoAnimationMode::Emote,
         };

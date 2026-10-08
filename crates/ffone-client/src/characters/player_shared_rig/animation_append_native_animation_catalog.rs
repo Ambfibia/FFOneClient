@@ -89,18 +89,21 @@ pub(super) fn append_native_animation_catalog(
             .map(|c| c.gltf_animation_index)
             .collect();
         for clip in entry.clips {
-            let semantic =
+            let playback =
                 crate::tutorial_player_presentation::TutorialPlayerClip::from_exact_name(
                     &clip.name,
                 )
-                .filter(|c| expected_names.contains(&c.name()))
+                .map(|c| c.playback().contract_value())
+                // HNPC civilians share the actor rig, but player input uses run.
+                .or_else(|| (clip.name == "walk").then_some("loop"))
+                .filter(|_| expected_names.contains(&clip.name.as_str()))
                 .ok_or_else(|| format!("unknown clip in {path}"))?;
             if !names.insert(clip.name.clone())
                 || !indices.insert(clip.gltf_animation_index)
                 || clip.channel_count == 0
                 || !clip.duration_seconds.is_finite()
                 || clip.duration_seconds <= 0.0
-                || semantic.playback().contract_value() != clip.playback
+                || playback != clip.playback
             {
                 return Err(format!("invalid or duplicate clip in {path}"));
             }

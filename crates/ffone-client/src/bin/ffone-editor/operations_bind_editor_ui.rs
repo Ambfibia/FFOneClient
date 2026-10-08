@@ -8,9 +8,13 @@ pub(super) fn bind_editor_ui(
     runtime: Res<EditorRuntimeStatus>,
     equipment: Res<EquipmentLibrary>,
     player_preview: Res<ffone_client::player_preview::NativePlayerPreviewModel>,
+    mut world: ResMut<world_editor::WorldEditor>,
+    xdt: Res<xdt::XdtEditor>,
     mut texts: Query<(&DynamicTextRole, &mut LocalizedText)>,
     mut catalog_slots: Query<(&CatalogSlot, &mut Node), Without<AnimationSlot>>,
     mut animation_slots: Query<(&AnimationSlot, &mut Node), Without<CatalogSlot>>,
+    mut action_nodes: Query<(&EditorAction, &mut Node),
+        (Without<CatalogSlot>, Without<AnimationSlot>, Without<TimelineFill>)>,
     mut timeline: Single<
         &mut Node,
         (
@@ -27,8 +31,19 @@ pub(super) fn bind_editor_ui(
         return;
     }
     let entry = &catalog.entries[state.selected];
+    if entry.kind == CatalogKind::Npc && state.npc_inspector == NpcInspectorTab::Details {
+        if let Some(folder) = xdt.server_folder() {
+            world.prepare_npc_details(&folder,entry.network_id.unwrap_or(0));
+        }
+    }
     let filtered = state.filtered(&catalog);
     let animation_pages = page_count(entry.animations.len(), ANIMATION_SLOTS);
+    for (action, mut node) in &mut action_nodes {
+        if *action == EditorAction::NewNpcTemplate {
+            node.display = if state.kind == CatalogKind::Npc { Display::Flex } else { Display::None };
+        }
+        if *action==EditorAction::ToggleDetails {node.display=if state.kind==CatalogKind::Npc{Display::None}else{Display::Flex};}
+    }
     for (slot, mut node) in &mut catalog_slots {
         let display = if filtered.binary_search(&slot.0).is_ok() {
             Display::Flex
@@ -183,6 +198,11 @@ pub(super) fn bind_editor_ui(
             )
             .with_arg("semantic", entry.semantic_id.clone())
             .with_arg("logical", entry.logical_name.clone()),
+            DynamicTextRole::InspectorPlacements => LocalizedText::new("ui.editor.npc.placements", "{placements}")
+                .with_arg("placements", entry.network_id.map(|id| {
+                    let count=xdt.npc_reference_count(id);let used=count>0||world.npc_has_placements(id);
+                    format!("{}\n\n{}\n{}", world.npc_placements(id, &localization, &language), localization.text(&language, &LocalizedText::new("ui.editor.npc.reference_count", "Related table records: {count}").with_arg("count",count.to_string())),localization.text(&language,&LocalizedText::new(if used{"ui.editor.npc.usage_used"}else{"ui.editor.npc.usage_unused"},if used{"ID is used in placements or table references"}else{"ID is unused: no placements or table references"})))
+                }).unwrap_or_default()),
             DynamicTextRole::InspectorSource => LocalizedText::new(
                 "ui.editor.inspector.source",
                 "XDT row: {row}\nNetwork ID: {network}\nSource: {source}",
@@ -345,11 +365,15 @@ pub(super) fn style_editor_buttons(
     {
         let selected = match *action {
             EditorAction::Strings => state.strings_open,
-            EditorAction::Xdt => state.xdt_open,
-            EditorAction::Tab(kind) => !state.strings_open && !state.xdt_open && state.kind == kind,
+            EditorAction::Xdt => state.xdt_open && !state.missions_open,
+            EditorAction::Missions => state.xdt_open && state.missions_open,
+            EditorAction::World2d => state.world_open == Some(false),
+            EditorAction::World3d => state.world_open == Some(true),
+            EditorAction::Tab(kind) => !state.strings_open && !state.xdt_open && state.world_open.is_none() && state.kind == kind,
             EditorAction::EquipmentGender(female) => state.equipment_female == female,
             EditorAction::EquipmentCategory(category) => state.equipment_category == category,
             EditorAction::ToggleDetails => state.details_open,
+            EditorAction::NpcInspector(tab) => state.npc_inspector==tab,
             EditorAction::CatalogSlot(index) => index == state.selected,
             EditorAction::DefaultPose => state.pose_mode == EditorPoseMode::Default,
             EditorAction::TPose => state.pose_mode == EditorPoseMode::TPose,

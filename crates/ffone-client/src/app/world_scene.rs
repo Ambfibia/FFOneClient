@@ -207,11 +207,12 @@ pub(super) fn recover_failed_world_ready_connection(
             next_state.set(ClientState::Login);
             loading.finish();
             if let Some(credentials) = credentials {
-                if let Err(relogin_error) = bridge.send(NetworkCommand::Login {
-                    login_address: config.login_address.clone(),
-                    username: credentials.username.clone(),
-                    password: credentials.password.clone(),
-                }) {
+                let command = if credentials.cookie {
+                    NetworkCommand::LoginCookie { login_address: config.login_address.clone(),
+                        username: credentials.username.clone(), cookie: credentials.password.clone() }
+                } else { NetworkCommand::Login { login_address: config.login_address.clone(),
+                    username: credentials.username.clone(), password: credentials.password.clone() } };
+                if let Err(relogin_error) = bridge.send(command) {
                     format!("{failure}; shard disconnected safely, sign in again: {relogin_error}")
                 } else {
                     format!("{failure}; reconnecting to character selection")
@@ -240,6 +241,7 @@ pub(super) fn update_legacy_avatar_environment(
     mut water_occlusion: ffone_client::world::NativeWaterOcclusion,
     mut runtime: ResMut<RuntimeStatus>,
     mut audio: ResMut<GameplayAudioRuntime>,
+    mut sent_poison: Local<std::collections::BTreeMap<Entity, (i64, i32, bool)>>,
     mut players: Query<
         (
             Entity,
@@ -252,6 +254,7 @@ pub(super) fn update_legacy_avatar_environment(
         With<LocalPlayer>,
     >,
 ) {
+    sent_poison.retain(|entity, _| players.contains(*entity));
     let delta_seconds = time.delta_secs().max(0.0);
     let local_tutorial_hp_authority = tutorial.owns_local_hp();
     for (player, transform, _controller, mut environment, network_identity, presentation) in
@@ -338,11 +341,18 @@ pub(super) fn update_legacy_avatar_environment(
         {
             environment.poisoned = flags.poisoned;
             environment.poison_transition_elapsed_seconds = 0.0;
-            if network_identity.is_some()
-                && let Err(error) =
-                    bridge.send(NetworkCommand::EnvironmentDamage(environment.poisoned))
-            {
-                runtime.message = error;
+        }
+
+        // Warp rebuilds the environment component with poisoned=false. Keep
+        // the last transmitted state separately so that reset still sends OFF,
+        // even when the fresh component observes no local boolean transition.
+        if let Some(identity) = network_identity {
+            let desired = (identity.pc_uid, identity.player_id, environment.poisoned);
+            if sent_poison.get(&player) != Some(&desired) {
+                match bridge.send(NetworkCommand::EnvironmentDamage(environment.poisoned)) {
+                    Ok(()) => { sent_poison.insert(player, desired); }
+                    Err(error) => runtime.message = error,
+                }
             }
         }
 

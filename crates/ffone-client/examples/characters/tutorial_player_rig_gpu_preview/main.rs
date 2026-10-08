@@ -6,6 +6,7 @@
 //! `FFONE_PLAYER_PREVIEW_YAW` selects the camera angle in degrees.
 //! `FFONE_PLAYER_PREVIEW_DISMOUNT=1` captures both mounted and returned poses;
 //! `weapon-swap` captures item 328 -> item 43 -> unarmed at the same camera angle.
+//! `FFONE_PLAYER_PREVIEW_EQUIPMENT=4:449,6:188` selects protocol equipment slots and IDs.
 
 use std::{
     env, fs,

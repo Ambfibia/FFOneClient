@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn corruption_requests_all_three_reactions_without_changing_authoritative_stamina() {
+    let mut app = mechanics_app();
+    let owner = app.world_mut().spawn_empty().id();
+    activate_for_test(&mut app, owner);
+    app.world_mut().resource_mut::<TutorialNanoGameplayState>().world_presentation = Some(
+        WorldNanoGameplayPresentation {
+            model_path: "characters/nanos/nano_buttercup/nano_buttercup.glb".into(),
+            style: 0, skill_slot: 0,
+        });
+    for (flag, mode, clip) in [(4, LegacyNanoAnimationMode::Win, "win"),
+        (8, LegacyNanoAnimationMode::Tie, "tie"), (16, LegacyNanoAnimationMode::Lose, "lose")]
+    {
+        app.world_mut().resource_mut::<TutorialNanoGameplayCommandQueue>()
+            .play_corruption(owner, TUTORIAL_BUTTERCUP_NANO_ID, flag);
+        app.update();
+        let state = app.world().resource::<TutorialNanoGameplayState>();
+        assert_eq!(state.animation.mode(), mode);
+        assert_eq!(state.animation.clip(), Some(clip));
+        assert_eq!(state.stamina(), TUTORIAL_BUTTERCUP_INITIAL_STAMINA);
+    }
+    app.world_mut().resource_mut::<TutorialNanoGameplayCommandQueue>().play_corruption(owner, 99, 4);
+    app.update();
+    assert_eq!(app.world().resource::<TutorialNanoGameplayState>().animation.clip(), Some("lose"));
+}
+
+#[test]
 fn explicit_dismiss_emits_es10_at_the_nano_before_the_dismissal_event() {
     let mut app = mechanics_app();
     app.init_resource::<GameplayAudioRuntime>();

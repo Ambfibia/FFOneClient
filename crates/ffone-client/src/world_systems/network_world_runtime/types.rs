@@ -171,6 +171,9 @@ impl NetworkNpcVisualCatalog0104 {
     pub fn get(&self, npc_type: i32) -> Option<&NetworkNpcVisualDefinition0104> {
         self.definitions.get(&npc_type)
     }
+    pub fn shiny_models(&self) -> impl Iterator<Item = (i32, &str)> {
+        self.shinies.iter().filter_map(|(id,visual)|visual.as_ref().ok().map(|v|(*id,v.glb.as_str())))
+    }
 
     #[must_use]
     pub fn get_hnpc(&self, npc_type: i32) -> Option<&NetworkHnpcVisualDefinition0104> {

@@ -41,6 +41,7 @@ mod state;
 mod input;
 mod operations_extract_journal_nanos;
 mod operations_extract_missions;
+mod mission_visibility;
 mod operations_extract_gameplay_npcs;
 mod operations_extract_warps;
 mod containers;
@@ -48,6 +49,7 @@ mod containers;
 pub use constants::{
     TUTORIAL_MISSION_TASK_IDS, TUTORIAL_MISSION_NPC_TYPES, TUTORIAL_WARP_NPC_TYPES
 };
+pub use mission_visibility::{MissionMarkerSurface, MissionMarkerVisibility};
 use constants::{
     TABLE_SET_SCHEMA, CONSOLIDATED_TABLE, OPTIONAL_USER_EQUIP_ITEM_TABLES,
     EXISTING_USER_EQUIP_ICON_SUBTABLES, VENDOR_ITEM_TABLES, EXPECTED_WARPS,

@@ -5,9 +5,17 @@ pub(super) fn draw(
     fonts: Option<Res<EditorFonts>>,
     state: Res<EditorState>,
     mut editor: ResMut<StringEditor>,
+    xdt: Res<xdt::XdtEditor>,
+    catalog: Res<EditorCatalog>,
+    server: Res<AssetServer>,
     roots: Query<Entity, With<StringsRoot>>,
     mut shown: Local<(bool, u64)>,
 ) {
+    if state.strings_open && xdt.is_changed() {
+        editor.speakers=xdt.string_speakers(&editor.en);
+        editor.filter_dirty=true;
+        editor.revision+=1;
+    }
     if *shown == (state.strings_open, editor.revision) {
         return;
     }
@@ -22,6 +30,10 @@ pub(super) fn draw(
         return;
     }
     if editor.filter_dirty || editor.filter_query != editor.tools.filter {
+        editor.context_keys=if editor.context_mode==0 {None} else {
+            Some(editor.tools.filter.trim().parse::<i64>().ok().map(|id|xdt.related_string_keys(editor.context_mode,id,&editor.en)).unwrap_or_default())
+        };
+        if editor.speakers.is_empty(){editor.speakers=xdt.string_speakers(&editor.en);}
         editor.filtered = editor.keys();
         editing_tools::sort_rows(&mut editor);
         editor.row_indices = editor
@@ -84,7 +96,13 @@ pub(super) fn draw(
             ZIndex(200),
             BackgroundColor(Color::srgb(0.012, 0.035, 0.05)),
         ))
-        .with_children(|root| {
+            .with_children(|root| {
+                root.spawn(Node {width:percent(100),column_gap:px(8),..default()}).with_children(|p|{
+                    for (mode,key,en) in [(0,"text","Text"),(1,"mission_id","Mission ID"),(2,"npc_id","NPC ID")] {
+                        p.spawn((Node {padding:UiRect::all(px(2)),..default()},BackgroundColor(if editor.context_mode==mode{Color::srgb(0.15,0.7,0.85)}else{Color::NONE}))).with_children(|p|
+                            button(p,&fonts,Action::ContextMode(mode),&format!("ui.editor.strings.context.{key}"),en));
+                    }
+                });
             root.spawn(Node {
                 width: percent(100),
                 column_gap: px(12),
@@ -335,6 +353,9 @@ pub(super) fn draw(
                                         ),
                                     ));
                                 });
+                                if let Some(path)=editor.speakers.get(key).and_then(|id|catalog.entries.iter().find(|e|e.kind==CatalogKind::Npc&&e.network_id==Some(*id))).and_then(|e|e.icon_path.as_ref()) {
+                                    row.spawn((Node {width:px(28),height:px(28),flex_shrink:0.,margin:UiRect::top(px(12)),..default()},ImageNode::new(server.load(path.clone()))));
+                                } else {row.spawn(Node {width:px(28),flex_shrink:0.,..default()});}
                                 for russian in [false, true] {
                                     let mut cell = row.spawn(Node {
                                         flex_grow: 1.,

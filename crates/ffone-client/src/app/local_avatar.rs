@@ -31,7 +31,7 @@ use ffone_client::{
     tutorial_player_rig_runtime::TutorialSkywayPresentation,
     user_equip_ui::UserEquipUiState,
     world_audio::RetrobutionInstanceAudioState,
-    world_behaviour::{WorldRopeTraversal, WorldSlopeTraversal, WorldZiplineTraversal},
+    world_behaviour::{WorldLauncherTraversal, WorldRopeTraversal, WorldSlopeTraversal, WorldZiplineTraversal},
 };
 use ffone_protocol::{
     PcSpecialStateSwitchRequest0104, PcVehicleOffRequest0104, PcVehicleOnRequest0104, WirePayload,
@@ -111,12 +111,14 @@ pub(super) fn sync_local_avatar_presentation(
             Option<&WorldSlopeTraversal>,
             Option<&WorldZiplineTraversal>,
             Option<&WorldRopeTraversal>,
+            Option<&WorldLauncherTraversal>,
+            &LegacyPlayerController,
         ),
         With<LocalPlayer>,
     >,
 ) {
     skyway_presentation.active = transportation.skyway_active;
-    let Ok((player, transform, environment, mut presentation, mut actions, slope, zipline, rope)) =
+    let Ok((player, transform, environment, mut presentation, mut actions, slope, zipline, rope, launcher, controller)) =
         players.single_mut()
     else {
         return;
@@ -130,8 +132,20 @@ pub(super) fn sync_local_avatar_presentation(
 
     let traversal = if transportation.skyway_active {
         LegacyAvatarTraversalPresentation::BroomStick
-    } else if zipline.is_some() {
+    } else if zipline.is_some() && !controller.movement_enabled {
         LegacyAvatarTraversalPresentation::Zipline
+    } else if controller.launcher_active() {
+        if launcher.is_some_and(|flight| flight.upward_pose) {
+            if actions.launcher_pose_finished() {
+                LegacyAvatarTraversalPresentation::LauncherIdle
+            } else if controller.velocity.y <= 0.0 {
+                LegacyAvatarTraversalPresentation::LauncherFall
+            } else {
+                LegacyAvatarTraversalPresentation::Launcher
+            }
+        } else {
+            LegacyAvatarTraversalPresentation::LauncherUnposed
+        }
     } else if let Some(rope) = rope {
         rope_traversal_presentation(rope.move_type, input.local_axis)
     } else if slope.is_some() {

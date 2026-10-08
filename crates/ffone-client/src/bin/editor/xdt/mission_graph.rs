@@ -90,9 +90,13 @@ pub(super) fn validate(before: &[Value], after: &[Value]) -> Result<(), String> 
         let from=after.iter().find(|r|r["m_iHTaskID"].as_i64()==Some(edge.from));
         let to=after.iter().find(|r|r["m_iHTaskID"].as_i64()==Some(edge.to));
         if let (Some(from),Some(to))=(from,to) {
-            if from["m_iHMissionID"]!=to["m_iHMissionID"] {return Err("Transitions must stay within the same mission".into());}
+            if from["m_iHMissionID"]!=to["m_iHMissionID"] {
+                return Err(schema::task_error(from, "Transitions must stay within the same mission"));
+            }
         }
-        if edge.field=="m_iSUOutgoingTask"&&reachable(&success,edge.to,edge.from){return Err("Success transitions cannot create a cycle".into());}
+        if edge.field=="m_iSUOutgoingTask"&&reachable(&success,edge.to,edge.from) {
+            return Err(schema::task_error(&after[edge.row], "Success transitions cannot create a cycle"));
+        }
     }
     let old = edges(before, false);
     let new = edges(after, false);
@@ -100,7 +104,7 @@ pub(super) fn validate(before: &[Value], after: &[Value]) -> Result<(), String> 
         if !old.iter().any(|e| e.from == edge.from && e.to == edge.to)
             && reachable(&new, edge.to, edge.from)
         {
-            return Err("Mission prerequisite would create a cycle".into());
+            return Err(schema::task_error(&after[edge.row], "Mission prerequisite would create a cycle"));
         }
     }
     Ok(())

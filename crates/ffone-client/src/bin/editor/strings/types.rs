@@ -30,6 +30,9 @@ pub(in super::super) struct StringEditor {
     pub(super) row_indices: BTreeMap<String, usize>,
     pub(super) filter_query: String,
     pub(super) filter_dirty: bool,
+    pub(super) context_mode: u8,
+    pub(super) context_keys: Option<BTreeSet<String>>,
+    pub(super) speakers: BTreeMap<String,i64>,
     pub(super) offset: f32,
     pub(super) viewport: Vec2,
     pub(super) row_starts: Vec<f32>,
@@ -70,6 +73,9 @@ impl StringEditor {
             row_indices: BTreeMap::new(),
             filter_query: String::new(),
             filter_dirty: true,
+            context_mode: 0,
+            context_keys: None,
+            speakers: BTreeMap::new(),
             offset: 0.,
             viewport: Vec2::ZERO,
             row_starts: Vec::new(),
@@ -165,6 +171,7 @@ impl StringEditor {
                 return Err("Files changed during save; synchronize and retry".into());
             }
             for (path, temporary) in staged {
+                backups::retain(&path)?;
                 temporary.persist(path).map_err(|e| e.to_string())?;
             }
             en.entries = merged_en.clone();
@@ -202,6 +209,7 @@ impl StringEditor {
         self.en
             .iter()
             .filter(|(key, en)| {
+                if let Some(keys)=&self.context_keys{return keys.contains(*key);}
                 self.tools.filter_matches(key)
                     || self.tools.filter_matches(en)
                     || self

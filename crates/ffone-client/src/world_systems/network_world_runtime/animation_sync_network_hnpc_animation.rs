@@ -8,7 +8,7 @@ pub(super) struct NetworkNpcAnimationEffectEvent0104 {
     pub(super) node_name: Option<String>,
 }
 
-pub(super) fn parse_network_npc_animation_document(bytes: &[u8]) -> Result<Value, String> {
+pub(crate) fn parse_network_npc_animation_document(bytes: &[u8]) -> Result<Value, String> {
     if bytes.len() < 20 || &bytes[0..4] != b"glTF" {
         return Err("semantic character is not a GLB 2.0 container".to_owned());
     }

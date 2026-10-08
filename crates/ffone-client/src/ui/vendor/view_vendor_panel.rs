@@ -319,6 +319,7 @@ pub(super) fn spawn_vendor_row(parent: &mut ChildSpawnerCommands, row: usize, as
         .spawn((
             Button,
             VendorUiElement::Row(row),
+            crate::ui::shared::controller::ControllerUiDefault,
             VendorInteractiveControl::Row(row),
             Node {
                 display: Display::None,
@@ -439,6 +440,7 @@ pub(super) fn spawn_vendor_tab_button(
         Button,
         marker,
         control,
+        crate::ui::shared::controller::ControllerUiTab(if control == VendorInteractiveControl::BuyTab { 0 } else { 1 }),
         node,
         BackgroundColor(Color::NONE),
         Text::new(value),
@@ -577,6 +579,7 @@ pub(super) fn spawn_vendor_pc_stuff_panel(parent: &mut ChildSpawnerCommands, ass
             panel.spawn((
                 Button,
                 VendorUiElement::Close,
+                crate::ui::shared::controller::ControllerUiClose,
                 VendorInteractiveControl::Close,
                 VendorUiRect::from(USER_EQUIP_CLOSE_RECT).node(),
                 stretched_image(assets.image(VendorStaticAssetRole::Close)),

@@ -238,16 +238,23 @@ assets/game/characters/
   nanos/<id>/
   npcs/<id>/
   mobs/<id>/
-  shared/<id>/
+  fusions/<id>/
+  shared/textures/
+  shared/runtime-textures/
 assets/game/data/tables/xdt.json
 ```
 
 The native_asset_routes table, m_pCharacterModelData array, maps semantic model IDs
 to exact GLB paths, animations and optional collision paths. Migration inventories and
 hashes are archived in FusionForge docs; the client does not open them.
-Exporter family and source-owner aliases remain provenance and never choose a
-singular runtime folder. Shared rigs or models belong under
-`characters/shared`.
+The category chooses the physical directory; accepted semantic IDs retain their
+original namespace when a model is reclassified. Sharing a model between gameplay
+roles does not move it into `shared`: NPC models belong to `npcs`, ordinary mobs to
+`mobs`, and Fusion character counterparts to `fusions`. Reusable texture payloads
+remain in `shared`; GLBs reference them without copies. Existing variants and
+logical-name aliases remain distinct, including alternate NPC packages nested
+under the same stable package slug. Exporter family and source-owner aliases do
+not choose the runtime folder.
 
 Old `characters/catalog.json`, `characters/registry.json`,
 `characters/schema-upgrade-violations.json`, and singular

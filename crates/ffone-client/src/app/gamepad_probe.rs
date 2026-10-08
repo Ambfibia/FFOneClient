@@ -7,12 +7,14 @@ use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use ffone_client::option_ui::{OptionOpenAudioRoute, OptionTab, OptionTabButton};
 
 mod screens;
+mod services;
 
 #[derive(Resource, Default)]
 struct Probe {
     device: Option<Entity>,
     phase: u8,
     frames: u32,
+    waiting_frames: u32,
     button: Option<GamepadButton>,
     stick: Vec2,
     first_focus: Option<Entity>,
@@ -35,7 +37,13 @@ pub(super) fn install(app: &mut App) {
             PreUpdate,
             inject.after(InputSystems).before(sample_gamepad_actions),
         )
-        .add_systems(PostUpdate, drive.after(bevy::ui::UiSystems::Layout));
+        .add_systems(PostUpdate, (|world: &mut World| {
+            if env::var_os("FFONE_PERF_GAMEPAD_SCENARIO").is_some() {
+                services::drive(world);
+            } else {
+                drive(world);
+            }
+        }).after(bevy::ui::UiSystems::Layout));
 }
 
 fn discard_offline_network(bridge: Res<ffone_client::network::NetworkBridge>) {
@@ -48,7 +56,7 @@ fn discard_offline_network(bridge: Res<ffone_client::network::NetworkBridge>) {
 }
 
 fn inject(probe: Res<Probe>, mut pads: Query<&mut Gamepad>, mut mission: ResMut<MissionUiModel>) {
-    if probe.phase == 7 {
+    if probe.phase == 7 && env::var_os("FFONE_PERF_GAMEPAD_SCENARIO").is_none() {
         // Offline capture has no world-ready packet; present the open NanoCom
         // state at the input boundary to exercise Start while it owns UI.
         mission.enabled = true;

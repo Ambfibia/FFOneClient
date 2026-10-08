@@ -165,7 +165,8 @@ pub fn simulate_legacy_players(
             if controller.grounded {
                 controller.advance_jump_key();
             }
-            let jump_just_pressed = input.jump_just_pressed && !controller.incapacitated;
+            let jump_just_pressed = input.jump_just_pressed && !controller.incapacitated
+                && !controller.launcher_active();
             controller.step_normal_vertical(jump_just_pressed, delta_seconds);
         }
 
@@ -175,7 +176,7 @@ pub fn simulate_legacy_players(
         // camera yaw for the next frame. Jump() sets bMoveFlag even with no
         // horizontal input; arrow alt-bindings call SetForceAngle.
         let movement_yaw_degrees = controller.yaw_degrees;
-        let apply_camera_yaw_after_move = should_apply_camera_yaw(
+        let apply_camera_yaw_after_move = !controller.launcher_active() && should_apply_camera_yaw(
             has_horizontal_input,
             controller.jumping,
             input.free_camera_held,
@@ -206,7 +207,7 @@ pub fn simulate_legacy_players(
             controller.vertical_velocity,
             horizontal_velocity.z,
         );
-        controller.velocity = if controller.flight_enabled {
+        controller.velocity = if controller.flight_enabled || controller.launcher_active() {
             requested_velocity
         } else {
             controller.apply_surface_sliding(requested_velocity)
@@ -245,7 +246,7 @@ pub fn simulate_legacy_players(
         }
 
         controller.packet_elapsed += delta_seconds;
-        if packet_is_due(&controller, direction_key) {
+        if !controller.launcher_active() && packet_is_due(&controller, direction_key) {
             controller.packet_position_sampled_this_frame = true;
             let speed_server_units = (if controller.vehicle_speed.is_some() { frame_velocity.length() } else { speed } * 100.0) as i32;
             let intent = if controller.jumping {

@@ -94,6 +94,66 @@ fn every_installed_character_is_reachable_by_its_package_route() {
 }
 
 #[test]
+fn production_catalog_resolves_academy_soulo_shell() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
+    let locator = AssetLocator::open(&root).unwrap();
+    let catalog = NetworkNpcVisualCatalog0104::open(&locator).unwrap();
+    let shell = catalog.get(3622).expect("Academy Soulo Shell NPC type");
+    assert_eq!(shell.logical_name, "mob_fusionbomb");
+    assert_eq!(shell.glb, "characters/mobs/mob_fusionbomb/mob_fusionbomb.glb");
+    assert_eq!(shell.table_scale, 1.0);
+    assert_eq!(shell.height_server_units, 80);
+    let texture = shell.main_texture.as_ref().expect("Academy body texture");
+    assert_eq!(texture.true_name, "mob_fusionbomb");
+    assert_eq!(texture.path, "characters/mobs/mob_fusionbomb/mob_fusionbomb.textures/mob_fusionbomb.png");
+    assert!(shell.sub_texture.is_none());
+    let bytes = std::fs::read(root.join(&shell.glb)).unwrap();
+    let document = parse_network_npc_animation_document(&bytes).unwrap();
+    let death = &document["extras"]["ffone"]["metadataOnlyAnimations"][0];
+    assert_eq!(death["name"], "death");
+    assert_eq!(death["metadata"]["events"][0]["functionName"], "end");
+    assert_eq!(death["metadata"]["events"][0]["time"], 0.0);
+    assert!(!catalog.issues.iter().any(|issue| issue.npc_type == 3622));
+}
+
+#[test]
+fn production_reclassified_characters_preserve_runtime_selection_and_variants() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
+    let locator = AssetLocator::open(root).unwrap();
+    let catalog = NetworkNpcVisualCatalog0104::open(&locator).unwrap();
+    for (npc_type, category, package) in [
+        (3206, "npc", "npc_mandroid_chef"),
+        (2498, "npc", "npc_mandroid1"),
+        (2226, "npc", "npc_kevin"),
+        (3440, "fusion", "npc_fusion_johnnytest"),
+        (3462, "fusion", "npc_fusionfinn"),
+        (3433, "fusion", "npc_fusionrex"),
+        (3460, "fusion", "fusion_kimchi"),
+        (3437, "mob", "npc_hibagore"),
+        (3461, "mob", "npc_killerclyde"),
+    ] {
+        let model = catalog.get(npc_type).expect("reclassified runtime model");
+        assert_eq!(model.category, category);
+        assert!(model.glb.starts_with(&format!("characters/{category}s/{package}/")));
+    }
+    let registry = locator.read_character_models().unwrap();
+    let models = parse_character_registry(&registry).unwrap();
+    for (name, path) in [
+        ("npc_deedee", "characters/npcs/npc_deedee/npc_deedee.glb"),
+        ("omniverse_kevin", "characters/npcs/omniverse_kevin/npc_kevinlevin.glb"),
+        ("npc_kevin", "characters/npcs/npc_kevin/npc_kevin.glb"),
+        ("npc_3458_kevin", "characters/npcs/npc_3458_kevin/npc_kevin.glb"),
+    ] {
+        let model = select_registry_model(&models[name]).expect("unambiguous NPC variant");
+        assert_eq!(model.category, "npc");
+        assert_eq!(model.glb, path);
+    }
+    for retired in ["npc_deedee2", "npc_deedee2_fixed_texture", "npc_kevinlevin"] {
+        assert!(!models.contains_key(retired), "unused model {retired} returned");
+    }
+}
+
+#[test]
 fn production_catalog_resolves_known_primary_npc_routes() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
     let locator = AssetLocator::open(root).unwrap();
@@ -110,11 +170,11 @@ fn production_catalog_resolves_known_primary_npc_routes() {
     assert_eq!(chef.logical_name, "npc_mandroid_chef");
     assert_eq!(
         chef.glb,
-        "characters/shared/npc_mandroid1/npc_mandroid_chef.glb"
+        "characters/npcs/npc_mandroid_chef/npc_mandroid_chef.glb"
     );
     assert_eq!(
         catalog.get(2498).unwrap().glb,
-        "characters/shared/npc_mandroid1/npc_mandroid1.glb"
+        "characters/npcs/npc_mandroid1/npc_mandroid1.glb"
     );
     assert_eq!(catalog.get_hnpc(2586).unwrap().appearance_index, 174);
     assert_eq!(catalog.get_hnpc(2587).unwrap().appearance_index, 178);
@@ -267,7 +327,7 @@ fn production_catalog_resolves_known_primary_npc_routes() {
     assert_eq!(hostile_kevin.logical_name, "npc_kevin");
     assert_eq!(
         hostile_kevin.main_texture.as_ref().unwrap().path,
-        "characters/shared/npc_kevin/npc_kevin.textures/npc_kevin.png"
+        "characters/npcs/npc_kevin/npc_kevin.textures/npc_kevin.png"
     );
     let kevin = catalog
         .get(3380)

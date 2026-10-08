@@ -180,6 +180,15 @@ impl Localization {
                 "localization fallback {fallback:?} is not present in the catalog"
             ));
         }
+        if let Ok(document) = locator.read_json::<serde_json::Value>(crate::assets::TABLE_SET_PATH) {
+            for (key, source) in super::mission_links::mission_text_links(&document) {
+                for bundle in bundles.values_mut() {
+                    if let Some(text) = bundle.get(&source).cloned() {
+                        bundle.entry(key.clone()).or_insert(text);
+                    }
+                }
+            }
+        }
         let requested = normalize_language(requested);
         let effective = resolve_locale(&bundles, &requested, &fallback);
         let fallback_keys_by_source = unique_fallback_source_keys(

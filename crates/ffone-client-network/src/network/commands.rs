@@ -1,6 +1,11 @@
 use super::*;
 
 pub enum NetworkCommand {
+    LoginCookie {
+        login_address: String,
+        username: String,
+        cookie: String,
+    },
     Login {
         login_address: String,
         username: String,
@@ -98,6 +103,9 @@ pub enum NetworkCommand {
 impl fmt::Debug for NetworkCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::LoginCookie { login_address, username, .. } => f.debug_struct("LoginCookie")
+                .field("login_address", login_address).field("username", username)
+                .field("cookie", &"<redacted>").finish(),
             Self::Login {
                 login_address,
                 username,

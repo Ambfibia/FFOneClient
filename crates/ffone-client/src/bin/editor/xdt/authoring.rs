@@ -29,13 +29,13 @@ pub(super) fn group(table: &str, field: &str) -> Option<&'static str> {
             | "m_iAtkAngle" | "m_iCombatRange" | "m_iNanoBattery1" => Some("combat"),
             "m_iWalkSpeed" | "m_iRunSpeed" | "m_iSwimSpeed" | "m_iJumpDistance"
             | "m_iJumpHeight" | "m_iSightRange" | "m_iIdleRange" => Some("movement"),
-            "m_iBarkerNumber" => Some("dialogue"),
+            "m_iBarkerNumber" | "m_iComment" => Some("dialogue"),
             // Other AI/skill codes remain available in All fields, without invented behavior.
             "m_iNpcType" => Some("other"),
             _ => None,
         },
         "m_pMissionData" => {
-            if matches!(field, "m_iHDifficultyType" | "m_iHMissionType" | "m_iHTaskType") {
+            if matches!(field, "m_iHDifficultyType" | "m_iHMissionType" | "m_iHTaskType" | "m_iHMissionVisibility") {
                 Some("identity")
             } else if matches!(field, "m_iCSUEnemyID" | "m_iCSUNumToKill") {
                 Some("defeat")
@@ -162,6 +162,18 @@ pub(super) fn blocks(table: &str, columns: &[String], value: &Value, advanced: b
                         .position(|p| *p == f)
                         .unwrap_or(preferred.len())
                 });
+                if table.ends_with("/m_pMissionData") {
+                    // Keep each speaker immediately before its message in the
+                    // start/success/failure sections, independently of suffix sorting.
+                    for pair in super::mission_events::PAIRS {
+                        if let (Some(speaker), Some(text)) = (fields.iter().position(|f| f == pair.1),
+                            fields.iter().position(|f| f == pair.0)) {
+                            let text = fields.remove(text);
+                            let speaker = fields.iter().position(|f| f == pair.1).unwrap_or(speaker);
+                            fields.insert(speaker + 1, text);
+                        }
+                    }
+                }
                 fields
             },
             core: matches!(key, "identity" | "objective" | "reward"),
@@ -285,6 +297,20 @@ impl XdtEditor {
             value,
             self.advanced,
         );
+        if self.mission_table() {
+            for (group,route,_,text,npc) in mail_fields::PAIRS {
+                if value[*route].as_i64().unwrap_or(0)&6==6 {
+                    if let Some(block)=result.iter_mut().find(|b|b.key==*group) {
+                        for field in [*npc,*text] {if !block.fields.iter().any(|f|f==field){block.fields.push(field.into());}}
+                    }
+                }
+            }
+            if let Some(identity) = result.iter_mut().find(|b| b.key == "identity") {
+                if !identity.fields.iter().any(|f| f == mission_visibility::FIELD) {
+                    identity.fields.push(mission_visibility::FIELD.into());
+                }
+            }
+        }
         if let Some(draft) = &self.draft {
             let missing: Vec<_> = draft
                 .required

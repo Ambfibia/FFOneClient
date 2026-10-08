@@ -6,6 +6,7 @@ fn pad_attack_obeys_modal_gate_and_releases() {
     use ffone_client::avatar_action::LegacyAvatarActionInput;
     let mut app = App::new();
     app.init_resource::<OptionProductionRuntime>()
+        .add_message::<bevy::input::gamepad::GamepadConnectionEvent>()
         .init_resource::<ButtonInput<KeyCode>>()
         .init_resource::<ButtonInput<MouseButton>>()
         .init_resource::<GamepadActionState>()
@@ -540,6 +541,40 @@ fn hotkeys_journal_opens_and_closes_without_opening_the_nanocom_menu() {
         app.world().resource::<MissionUiModel>().journal,
         MissionJournalUi::Hidden
     ));
+    assert!(
+        !app.world()
+            .resource::<ButtonInput<KeyCode>>()
+            .just_pressed(KeyCode::Escape)
+    );
+}
+
+#[test]
+fn gamepad_escape_closes_npc_dialogue_through_the_normal_close_intent() {
+    let mut app = app();
+    app.world_mut()
+        .resource_mut::<MissionUiModel>()
+        .show_npc_interaction(NpcInteractionUi {
+            npc_id: 9001,
+            npc_type: 650,
+            name: "NPC".into(),
+            available_missions: vec![],
+            completed_missions: vec![],
+            warp: None,
+            services: vec![],
+        });
+    press(&mut app, &[KeyCode::Escape]);
+    assert!(
+        !app.world()
+            .resource::<MissionUiModel>()
+            .npc_icon_mode_visible
+    );
+    assert_eq!(
+        app.world_mut()
+            .resource_mut::<GameplayUiOutbox>()
+            .drain()
+            .collect::<Vec<_>>(),
+        vec![GameplayUiAction::NpcIconClose { npc_id: 9001 }]
+    );
     assert!(
         !app.world()
             .resource::<ButtonInput<KeyCode>>()

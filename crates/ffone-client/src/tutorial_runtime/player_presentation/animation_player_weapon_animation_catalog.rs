@@ -29,6 +29,7 @@ pub enum TutorialPlayerClip {
     Death,
     Slide,
     RopeDown,
+    Launcher,
     RopeDrop,
     RopeLeft,
     RopeRight,

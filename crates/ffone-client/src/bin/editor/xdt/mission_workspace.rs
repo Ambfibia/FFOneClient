@@ -30,6 +30,10 @@ pub(super) struct Workspace {
     pub layout_dirty: bool,
     pub index: Vec<Vec<String>>,
     pub locale_text: BTreeMap<String, String>,
+    pub field_scrolls: BTreeMap<String, Vec2>,
+    pub event_locales: BTreeMap<(usize, String), usize>,
+    pub mob_level_picker: bool,
+    pub mob_level: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -47,12 +51,19 @@ pub(super) enum Context {
     Mission(usize),
     Edge(usize, String, usize),
     Field(String),
+    StagePosition(usize),
 }
 
 #[derive(Clone, Debug)]
 pub(super) enum Command {
     NewMission,
     NewStage,
+    FirstStage(usize),
+    LastStage(usize),
+    ChooseStagePosition(usize),
+    StagePosition(usize,usize),
+    EditObjective(usize),
+    EditEmail(usize,String,Option<usize>),
     Duplicate,
     ToggleMission(i64),
     ToggleStage(i64),
@@ -77,6 +88,11 @@ pub(super) enum Command {
     QuickPlaceholder(String),
     EditJournal(String),
     InspectField(usize, String),
+    EditEvent(usize, String),
+    EventLocale(usize, String, usize),
+    NpcTemplate(npc_templates::NpcTemplate),
+    NewVoiceType,
+    SelectServer,
     CopyId,
     OpenMission(usize),
     CopyMissionId(usize),

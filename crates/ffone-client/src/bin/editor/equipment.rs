@@ -526,10 +526,10 @@ pub(super) fn bind_section_visibility(
         let visible = if equipment.is_some() {
             state.kind == CatalogKind::Equipment
         } else if character.is_some() {
-            state.kind != CatalogKind::Equipment
+            state.kind != CatalogKind::Equipment && (state.kind!=CatalogKind::Npc || state.npc_inspector==NpcInspectorTab::Animations)
         } else {
             details.is_some_and(|details| {
-                !details.0 || (state.details_open && state.kind != CatalogKind::Equipment)
+                !details.0 || (state.kind != CatalogKind::Equipment && if state.kind==CatalogKind::Npc {state.npc_inspector==NpcInspectorTab::Details}else{state.details_open})
             })
         };
         let display = if visible {

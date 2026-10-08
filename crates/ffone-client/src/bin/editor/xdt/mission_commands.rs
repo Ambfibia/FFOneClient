@@ -33,12 +33,14 @@ impl XdtEditor {
                     .or_else(|| if identity.is_none() { old.get(i) } else { None });
                 for field in schema::required(&table.label) {
                     if value.get(*field).is_none() && (original.is_none() || original.is_some_and(|v| v.get(*field).is_some())) {
-                        return Err(format!("Required parameters: {field}"));
+                        return Err(schema::task_error(value, format!("Required parameters: {field}")));
                     }
                 }
                 for (field, v) in value.as_object().into_iter().flatten() {
                     if original.and_then(|v| v.get(field)) != Some(v) {
-                        if let Some(error) = schema::invalid(&table.label, field, v) { return Err(format!("{field}: {error}")); }
+                        if let Some(error) = schema::invalid(&table.label, field, v) {
+                            return Err(schema::task_error(value, format!("{field}: {error}")));
+                        }
                     }
                 }
             }
@@ -97,6 +99,19 @@ impl XdtEditor {
             text["m_pstrNameString"] = Value::from(objective);
             value["m_iHCurrentObjective"] = Value::from(texts.len());
             texts.push(text);
+        }
+        if !new_group && !duplicate {
+            if let Some(journal_table) = self.tables.iter().find(|t| t.label.ends_with("/m_pJournalData")) {
+                let journals = next.pointer_mut(&journal_table.pointer).and_then(Value::as_array_mut)
+                    .ok_or("Missing journal table")?;
+                if let Some(previous) = template["m_iSTJournalIDAdd"].as_u64().filter(|id| *id > 0)
+                    .and_then(|id| journals.get(id as usize)).cloned() {
+                    let mut journal = previous;
+                    journal["m_iDetailedTaskDesc"] = Value::from(0);
+                    value["m_iSTJournalIDAdd"] = Value::from(journals.len());
+                    journals.push(journal);
+                }
+            }
         }
         let rows = next.pointer_mut(&self.tables[self.table].pointer).and_then(Value::as_array_mut).ok_or("Missing mission table")?;
         let row = rows.len();
@@ -178,6 +193,12 @@ impl XdtEditor {
                 self.row=self.rows().iter().position(|v|v["m_iHMissionID"].as_i64()==Some(id));
                 self.workspace.view_request=Some(false);
             }
+            FirstStage(row) => self.set_stage_boundary(row, true)?,
+            LastStage(row) => self.set_stage_boundary(row, false)?,
+            ChooseStagePosition(row) => {self.workspace.context=Some((anchor,Context::StagePosition(row)));}
+            StagePosition(row,position) => self.set_stage_position(row,position)?,
+            EditObjective(row) => {self.row=Some(row);self.array_slot=None;self.workspace.selected=BTreeSet::from([row]);self.start_mission_text_edit("m_iHCurrentObjective",true)?;}
+            EditEmail(row,field,slot) => self.edit_email(row,&field,slot)?,
             ToggleStage(id) => {
                 if !self.workspace.collapsed_stages.remove(&id) { self.workspace.collapsed_stages.insert(id); }
                 self.workspace.layout_dirty = true;
@@ -217,6 +238,17 @@ impl XdtEditor {
             ConfirmDelete => self.delete_mission_stage()?,
             QuickCreate(field) => self.start_quick(&field)?,
             QuickPlaceholder(field) => self.start_quick_kind(&field, true)?,
+            NpcTemplate(kind) => self.choose_npc_template(kind)?,
+            NewVoiceType => {
+                self.start_quick("m_iComment")?;
+                let draft=self.draft.as_mut().ok_or("Missing voice draft")?;
+                draft.value["m_strComment2"]=Value::String(String::new());
+                draft.required=BTreeSet::from(["m_strComment2".into()]);
+                draft.name=None;
+                self.workspace.quick_text=None;
+                self.begin(Focus::Draft("m_strComment2".into()));
+            }
+            SelectServer => self.start_server_selection(l, lang),
             EditJournal(field) => self.start_journal_edit(&field)?,
             InspectField(row, field) => {
                 self.row = Some(row);
@@ -224,6 +256,13 @@ impl XdtEditor {
                 self.column_search = field.clone();
                 self.begin(Focus::Cell(field));
                 self.rebuild_links();
+            }
+            EditEvent(row, field) => self.edit_event(row, &field)?,
+            EventLocale(row, field, index) => {
+                let editing = self.workspace.quick.as_ref().is_some_and(|origin| origin.row == row && origin.field == field)
+                    && self.workspace.quick_text.is_some();
+                self.workspace.event_locales.insert((row, field), index.min(1));
+                if editing { self.begin(Focus::Locale(index.min(1))); }
             }
             OpenMission(row) => {
                 self.row = Some(row); self.graph_stages = true;
@@ -245,13 +284,17 @@ impl XdtEditor {
     }
     pub(super) fn mission_diagnostics(&mut self) {
         let mut issues = Vec::new();
+        let first = mission_dependencies::first_rows(self.rows());
         for (r, row) in self.rows().iter().enumerate().filter(|(_, v)| v["m_iHTaskID"].as_i64().is_some_and(|n| n > 0)) {
             for (field, value) in row.as_object().into_iter().flatten() {
                 if let Some(error) = schema::invalid(&self.tables[self.table].label, field, value) {
                     issues.push((r, field.clone(), error.into()));
                 }
             }
-            if row["m_iHNPCID"].as_i64() == Some(0) { issues.push((r, "m_iHNPCID".into(), "mission_no_giver".into())); }
+            if row["m_iHMissionID"].as_i64().and_then(|id| first.get(&id)) == Some(&r)
+                && row["m_iHNPCID"].as_i64() == Some(0) {
+                issues.push((r, "m_iHNPCID".into(), "mission_no_giver".into()));
+            }
         }
         for reference in self.references.iter().filter(|r| r.table == self.table && r.target_row.is_none()) {
             issues.push((reference.row, reference.field.clone(), "reference".into()));

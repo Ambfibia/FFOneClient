@@ -38,6 +38,14 @@ pub(super) fn advance_tutorial_player_animation_state(
     let Ok((mut player, mut transitions)) = players.get_mut(adapter.animation_player) else {
         return;
     };
+    if controller.launcher_active() || !controller.movement_enabled {
+        // AvatarLauncher/AvatarZipline begin with EndEmote. A queued emote
+        // cannot postpone the authoritative traversal pose or revive on exit.
+        adapter.emote_state = false;
+        adapter.emote_cursor = PlayerEmoteCursor::default();
+        queue.cancel_pending_direct_pose_overrides();
+        continuation.pending.retain(|(owner,_)| *owner != selected.controller_root);
+    }
     adapter.damage.advance(
         &mut player,
         matches!(action_state.authoritative_visual_clip(), LegacyVisualClip::Die | LegacyVisualClip::Death),
@@ -235,8 +243,9 @@ pub(super) fn advance_tutorial_player_animation_state(
                 });
         }
     }
-    let full_body_preempts_upper = matches!(action_state.locomotion,
-        crate::avatar_action::LegacyLocomotionState::RopeDown
+    let full_body_preempts_upper = controller.launcher_active() || matches!(action_state.locomotion,
+        crate::avatar_action::LegacyLocomotionState::Launcher
+            | crate::avatar_action::LegacyLocomotionState::RopeDown
             | crate::avatar_action::LegacyLocomotionState::RopeDrop
             | crate::avatar_action::LegacyLocomotionState::RopeLeft
             | crate::avatar_action::LegacyLocomotionState::RopeRight

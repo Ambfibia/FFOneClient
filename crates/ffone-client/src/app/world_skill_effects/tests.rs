@@ -48,6 +48,7 @@ fn corruption_packet_updates_hp_and_nano_and_emits_one_native_hit_projectile() {
         .insert_resource(content).insert_resource(effects)
         .init_resource::<NetworkNanoEffectEvents0104>()
         .init_resource::<NetworkNpcResultEffectEvents0104>()
+        .init_resource::<TutorialNanoGameplayCommandQueue>()
         .add_systems(Update, spawn_world_instant_skill_effects);
     app.world_mut().spawn((LocalPlayer, GlobalTransform::IDENTITY));
     app.world_mut().spawn((NetworkNpcAppearance0104(ffone_protocol::NpcAppearance0104 {
@@ -63,6 +64,7 @@ fn corruption_packet_updates_hp_and_nano_and_emits_one_native_hit_projectile() {
         let issues = effects.drain_issues().collect::<Vec<_>>();
         assert!(issues.is_empty(), "{issues:?}");
     }
+    assert!(!app.world().resource::<TutorialNanoGameplayCommandQueue>().is_empty());
 }
 
 #[test]
@@ -169,6 +171,7 @@ fn instant_nano_result_waits_for_attachment_and_is_consumed_once() {
         .insert_resource(content)
         .init_resource::<NetworkNanoEffectEvents0104>()
         .init_resource::<NetworkNpcResultEffectEvents0104>()
+        .init_resource::<TutorialNanoGameplayCommandQueue>()
         .insert_resource(TutorialEffectRuntime::with_library(
             TutorialEffectLibrary::load(&root).unwrap(),
         ))

@@ -414,6 +414,12 @@ pub(super) fn handle_gameplay_frame(
             return;
         }
     }
+    if let Ok(Some(message))=decode_server_message_0104(frame.packet_type,&frame.payload) {
+        let text=message.message.to_string_lossy();
+        if let Some(id)=text.strip_prefix("Quest ").and_then(|s|s.strip_suffix(" removed from completed missions.")).and_then(|s|s.parse::<i32>().ok()) {
+            if let Err(error)=world_spawn.world_modes.world_mission.accept_gm_mission_reset(id) {runtime.message=error;}
+        }
+    }
     match apply_server_message_frame_0104(
         &frame,
         runtime,

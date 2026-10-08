@@ -42,6 +42,8 @@ impl NativePlayerRigCatalog {
             ],
         )?;
         append_native_animation_catalog(&mut contract, &locator, "characters/player/shared/damage_animations.json", &["woundupper"])?;
+        append_native_animation_catalog(&mut contract, &locator, "characters/player/shared/launcher_animations.json", &["luncher"])?;
+        append_native_animation_catalog(&mut contract, &locator, "characters/player/shared/locomotion_animations.json", &["walk"])?;
         let item_catalog_bytes = locator.read(PLAYER_ITEM_SET_CATALOG_PATH)?;
         let item_catalog: PlayerItemModelCatalog = serde_json::from_slice(&item_catalog_bytes)
             .map_err(|error| {

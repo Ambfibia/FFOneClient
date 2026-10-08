@@ -436,6 +436,7 @@ pub(super) fn sync_tutorial_action_gate(
             Has<WorldZiplineTraversal>,
             Has<WorldRopeTraversal>,
             Has<WorldSlopeTraversal>,
+            Option<&LegacyPlayerController>,
         ),
         With<LocalPlayer>,
     >,
@@ -472,7 +473,7 @@ pub(super) fn sync_tutorial_action_gate(
                 .iter()
                 .any(|actor| tutorial_actor_needs_early_modal_lock(&model, actor)));
     let tutorial_weapon = tutorial_weapon_combat_profile(runtime.tutorial_weapon_id);
-    for (mut context, presentation, collider_pending, environment, zipline, rope, slope) in &mut players {
+    for (mut context, presentation, collider_pending, environment, zipline, rope, slope, controller) in &mut players {
         context.player_interaction_allowed = runtime.allow_player_interaction;
         context.dead = runtime.hp.is_some_and(|hp| hp <= 0);
         context.system_popup = system_popup;
@@ -487,6 +488,7 @@ pub(super) fn sync_tutorial_action_gate(
         // Scripted travel blocks the whole action branch, including Nano use
         // and weapon cycling, without overwriting inventory/tutorial locks.
         context.move_mode = if zipline
+            || controller.is_some_and(LegacyPlayerController::launcher_active)
             || rope
             || slope
             || transportation

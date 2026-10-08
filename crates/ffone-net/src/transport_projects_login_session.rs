@@ -34,8 +34,16 @@ impl LoginSession {
         username: &str,
         password: &str,
     ) -> Result<Self> {
-        let mut io = TcpFrameIo::connect(address)?;
         let request = LoginRequest::password_login(username, password, 1, 0, 44)?;
+        Self::connect_request(address, request)
+    }
+
+    pub fn connect_cookie<A: ToSocketAddrs>(address: A, username: &str, cookie: &str) -> Result<Self> {
+        Self::connect_request(address, LoginRequest::cookie_login(username, cookie, 1, 0, 44)?)
+    }
+
+    fn connect_request<A: ToSocketAddrs>(address: A, request: LoginRequest) -> Result<Self> {
+        let mut io = TcpFrameIo::connect(address)?;
         io.send_payload(packet::P_CL2LS_REQ_LOGIN, &request, DEFAULT_KEY)?;
 
         let first = loop {

@@ -140,7 +140,7 @@ pub use types::{
     WorldBillboard, WorldVisibilitySwitch, WorldEffectEmitter, WorldFloatingIconSpin,
     WorldTriggerKind, WorldTrigger,
     WorldPlatformMotion, WorldTriggerVolumeShape, WorldTriggerVolume, WorldRigidBody,
-    WorldWaypoint, WorldTriggerUseQueue, WorldZiplineTraversal, WorldRopeTraversal,
+    WorldWaypoint, WorldTriggerUseQueue, WorldZiplineTraversal, WorldLauncherTraversal, WorldRopeTraversal,
     WorldSlopeTraversal, WorldJumppadArmed, ActiveWorldLauncher, WorldBehavioursApplied,
     NativeWorldBehaviourDocument, BillboardRecord, VisibilitySwitchRecord,
     EffectEmitterRecord, TriggerRecord, WaypointRecord, TriggerVolumeRecord, RigidBodyRecord,
@@ -172,7 +172,7 @@ pub use operations_process_world_trigger_uses::{
 #[cfg(test)]
 use operations_process_world_trigger_uses::sample_cubic_vector;
 pub use operations_consume_world_launcher_outbox::{
-    finish_unsupported_world_slopes, consume_world_launcher_outbox,
+    finish_unsupported_world_slopes, consume_world_launcher_outbox, update_world_launcher_traversals,
     retire_unloading_world_behaviour_documents, materialize_pending_world_behaviours,
     add_world_preview_behaviour_systems
 };
@@ -188,10 +188,11 @@ use models::{legacy_static_model_id, reparent_authored_world_model, entity_or_an
 #[cfg(test)]
 use models::authored_model_local_transform;
 use systems_update_world_trigger_volumes::update_world_animations;
+use systems_update_world_trigger_volumes::world_zipline_request;
 pub use systems_update_world_trigger_volumes::{
     update_world_billboards, update_world_visibility_switches, update_world_platforms,
     update_world_floating_icons,
-    update_world_trigger_volumes, update_world_zipline_traversals,
+    update_world_trigger_volumes, update_world_zipline_traversals, finish_world_zipline_steps,
     update_world_rope_traversals, update_world_slope_traversals, update_world_belts,
     sync_world_launcher_input, apply_world_launcher_camera
 };

@@ -614,7 +614,14 @@ pub(super) fn bridge_legacy_avatar_visual_requests(
                 }
             )
     });
-    if death_override {
+    let traversal_override = requests.iter().any(|request| request.actor == selected.controller_root
+        && matches!(&request.command, LegacyVisualCommand::CrossFade {
+            requested_clip: LegacyVisualClip::Launcher | LegacyVisualClip::RopeDown
+                | LegacyVisualClip::RopeDrop | LegacyVisualClip::RopeLeft | LegacyVisualClip::RopeRight
+                | LegacyVisualClip::RopeStand1 | LegacyVisualClip::RopeStand2
+                | LegacyVisualClip::RopeTurn | LegacyVisualClip::RopeUp, ..
+        }));
+    if death_override || traversal_override {
         // Clean `AvatarDead` begins with EndEmote and cannot be masked by a
         // queued choreography pose from the previous frame.
         adapter.emote_state = false;
@@ -637,7 +644,7 @@ pub(super) fn bridge_legacy_avatar_visual_requests(
             adapter.emote_cursor = PlayerEmoteCursor::default();
         }
     }
-    if death_override || attack_override {
+    if death_override || traversal_override || attack_override {
         continuation
             .pending
             .retain(|(owner, _)| *owner != selected.controller_root);

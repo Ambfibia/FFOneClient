@@ -29,16 +29,19 @@ pub(super) fn network_worker(commands: Receiver<NetworkCommand>, events: SyncSen
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => break,
         };
+        let cookie_login = matches!(&command, NetworkCommand::LoginCookie { .. });
         match command {
             NetworkCommand::Login {
                 login_address,
                 username,
                 password,
-            } => {
+            } | NetworkCommand::LoginCookie { login_address, username, cookie: password } => {
                 disconnect_gameplay(&mut gameplay);
                 login = None;
                 let _ = events.send(NetworkEvent::Connecting);
-                match LoginSession::connect_password(login_address, &username, &password) {
+                let result = if cookie_login { LoginSession::connect_cookie(login_address, &username, &password) }
+                    else { LoginSession::connect_password(login_address, &username, &password) };
+                match result {
                     Ok(session) => {
                         let payment_flag = session.login_success().payment_flag;
                         let characters = character_summaries(&session);

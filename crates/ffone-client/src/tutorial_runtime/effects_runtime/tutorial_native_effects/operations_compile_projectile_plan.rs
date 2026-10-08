@@ -689,7 +689,7 @@ pub(super) fn mark_native_effect_billboards(
 ) {
     for (entity, name) in &names {
         if name.as_str().ends_with("BillboardCamera") {
-            commands.entity(entity).insert(NativeEffectBillboard);
+            commands.entity(entity).insert(NativeEffectBillboard::default());
         }
     }
 }
@@ -698,7 +698,7 @@ pub(super) fn orient_native_effect_billboards(
     cameras: Query<&GlobalTransform, (With<Camera3d>, With<LegacyOrbitCamera>)>,
     parents: Query<&GlobalTransform, Without<NativeEffectBillboard>>,
     mut billboards: Query<
-        (&GlobalTransform, &ChildOf, &mut Transform),
+        (&GlobalTransform, &ChildOf, &NativeEffectBillboard, &mut Transform),
         With<NativeEffectBillboard>,
     >,
 ) {
@@ -706,7 +706,7 @@ pub(super) fn orient_native_effect_billboards(
         return;
     };
     let camera_position = camera.translation();
-    for (global, parent, mut transform) in &mut billboards {
+    for (global, parent, billboard, mut transform) in &mut billboards {
         let direction = (camera_position - global.translation()).normalize_or_zero();
         if direction == Vec3::ZERO {
             continue;
@@ -714,10 +714,33 @@ pub(super) fn orient_native_effect_billboards(
         let Ok(parent_global) = parents.get(parent.parent()) else {
             continue;
         };
-        let global_rotation = Quat::from_rotation_arc(Vec3::Z, direction);
+        let global_rotation = if billboard.upright {
+            upright_billboard_rotation(direction)
+        } else { Quat::from_rotation_arc(Vec3::Z, direction) };
         let desired_rotation = parent_global.rotation().inverse() * global_rotation;
         if transform.rotation != desired_rotation {
             transform.rotation = desired_rotation;
+        }
+    }
+}
+
+fn upright_billboard_rotation(direction: Vec3) -> Quat {
+    // An arc from +Z introduces camera-dependent roll at oblique elevations.
+    // Keep the billboard's up axis in the world vertical plane instead.
+    Transform::IDENTITY.looking_to(-direction, Vec3::Y).rotation
+}
+
+#[cfg(test)]
+mod billboard_tests {
+    use super::*;
+    #[test]
+    fn oblique_camera_does_not_roll_mission_symbols() {
+        for direction in [Vec3::new(1., -1., 2.), Vec3::new(-2., 1., 1.), Vec3::Z] {
+            let direction = direction.normalize();
+            let rotation = upright_billboard_rotation(direction);
+            assert!((rotation * Vec3::Z).abs_diff_eq(direction, 0.0001));
+            assert!((rotation * Vec3::X).y.abs() < 0.0001);
+            assert!((rotation * Vec3::Y).y > 0.);
         }
     }
 }

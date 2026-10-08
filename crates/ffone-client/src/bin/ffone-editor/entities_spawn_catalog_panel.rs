@@ -175,7 +175,7 @@ pub(super) fn spawn_header(parent: &mut ChildSpawnerCommands, fonts: &EditorFont
                             EditorAction::Tab(CatalogKind::Equipment),
                             "ui.editor.tab.equipment",
                             "Equipment",
-                            130.,
+                            120.,
                         ),
                         (
                             EditorAction::Strings,
@@ -183,7 +183,10 @@ pub(super) fn spawn_header(parent: &mut ChildSpawnerCommands, fonts: &EditorFont
                             "Strings",
                             130.,
                         ),
-                        (EditorAction::Xdt, "ui.editor.xdt.tab", "XDT tables", 150.),
+                        (EditorAction::Xdt, "ui.editor.xdt.tab", "XDT tables", 125.),
+                        (EditorAction::Missions, "ui.editor.missions.tab", "Missions", 115.),
+                        (EditorAction::World2d, "ui.editor.world.2d", "World 2D", 125.),
+                        (EditorAction::World3d, "ui.editor.world.3d", "World 3D", 125.),
                     ] {
                         spawn_action_button(tabs, fonts, action, key, label, width);
                     }
@@ -248,6 +251,8 @@ pub(super) fn spawn_catalog_panel(
                         },
                     ));
                 });
+            spawn_action_button(panel, fonts, EditorAction::NewNpcTemplate,
+                "ui.editor.npc.new_template", "+ NPC from template", EDITOR_CATALOG_WIDTH - 30.);
             panel
                 .spawn(Node {
                     width: percent(100),

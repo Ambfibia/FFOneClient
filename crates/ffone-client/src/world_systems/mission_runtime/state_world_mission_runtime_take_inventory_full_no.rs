@@ -1,5 +1,18 @@
 use super::*;
 
+#[cfg(test)]
+mod gm_reset_tests {
+    use super::*;
+    #[test]
+    fn reset_clears_only_the_requested_mission_and_its_finished_tasks() {
+        let mut runtime=WorldMissionRuntime::default();
+        runtime.completed_mission_ids.extend([1,2]);runtime.completed_task_ids.extend([(1,10),(2,20)]);
+        runtime.accept_gm_mission_reset(1).unwrap();
+        assert!(!runtime.completed_mission_ids.contains(&1));assert!(runtime.completed_mission_ids.contains(&2));assert_eq!(runtime.completed_task_ids.len(),1);
+        assert!(runtime.accept_gm_mission_reset(0).is_err());assert!(runtime.accept_gm_mission_reset(2049).is_err());
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub struct WorldMissionRuntime {
     pub(super) inventory_full_notices: Vec<i32>,
@@ -38,6 +51,14 @@ impl WorldMissionRuntime {
             return Err("invalid GM mission ID".to_owned());
         }
         self.completed_mission_ids.insert(mission_id);
+        Ok(())
+    }
+
+    /// Clear completion only after RustyFusion acknowledges /deletequest.
+    pub fn accept_gm_mission_reset(&mut self,mission_id:i32)->Result<(),String> {
+        if !(1..=2048).contains(&mission_id) {return Err("invalid GM mission ID".into());}
+        self.completed_mission_ids.remove(&mission_id);
+        self.completed_task_ids.retain(|(id,_)|*id!=mission_id);
         Ok(())
     }
 

@@ -482,7 +482,35 @@ impl LegacyPlayerController {
         self.velocity = velocity;
         self.start_normal_jump(velocity.y);
         self.packet_elapsed = 0.0;
+        self.previous_collision_flags = 0;
         true
+    }
+
+    /// Cannon flight owns heading, movement packets and full-body presentation.
+    pub fn launcher_active(&self) -> bool {
+        self.scripted_horizontal_velocity.is_some()
+    }
+
+    pub(crate) fn launcher_hit_surface(&self) -> bool {
+        self.previous_collision_flags & 0b101 != 0
+    }
+
+    /// Submit EpUpdate's CharacterController.Move before the world's collision
+    /// pass. Zipline applies its hanging offset only after that Move resolves.
+    pub(crate) fn submit_scripted_move(&mut self, displacement: Vec3, delta_seconds: f32) {
+        self.last_move_displacement = displacement;
+        self.velocity = if delta_seconds > 0.0 { displacement / delta_seconds } else { Vec3::ZERO };
+    }
+
+    /// EpUpdate exits the cable/cannon with Jump(0), including the jump flag
+    /// and reset of surface-sliding state. Space cannot launch a second jump
+    /// during this fall before the next Below contact.
+    pub(crate) fn finish_scripted_traversal_with_jump(&mut self) {
+        self.finish_scripted_traversal(Vec3::ZERO);
+        self.start_normal_jump(0.0);
+        self.surface_sliding = false;
+        self.non_priority_collision = true;
+        self.previous_collision_flags = 0;
     }
 
     /// Suspends ordinary input integration while an authored rope/zipline

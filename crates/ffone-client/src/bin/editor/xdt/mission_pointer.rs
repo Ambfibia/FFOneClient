@@ -14,6 +14,7 @@ pub(super) struct Gesture {
     tooltip: bool,
     layout_before: Option<BTreeMap<String, [f32; 2]>>,
     right: Option<RightPan>,
+    objective_click:Option<(usize,f64)>,
 }
 
 struct RightPan {
@@ -78,7 +79,7 @@ fn priority(hit: &Hit) -> u8 {
     match hit {
         Hit::Canvas => 0,
         Hit::Node(..) | Hit::Neighbor(..) => 1,
-        Hit::Field(_) | Hit::Preview(..) => 2,
+        Hit::Field(_) | Hit::Preview(..) | Hit::Objective(..) => 2,
         Hit::Edge(..) => 3,
         Hit::Port(..) => 4,
         _ => 5,
@@ -380,6 +381,14 @@ pub(super) fn pointer(
                         gesture.start = Some(cursor);
                     }
                     editor.revision += 1;
+                }
+                Hit::Objective(row) => {
+                    let now=time.elapsed_secs_f64();
+                    if gesture.objective_click.is_some_and(|(previous,at)|previous==*row && now-at<=0.45) {
+                        editor.row=Some(*row);editor.array_slot=None;
+                        if let Err(error)=editor.start_mission_text_edit("m_iHCurrentObjective",true){editor.status=error;}
+                        gesture.objective_click=None;
+                    } else {gesture.objective_click=Some((*row,now));editor.row=Some(*row);editor.workspace.selected=BTreeSet::from([*row]);editor.revision+=1;}
                 }
                 Hit::Neighbor(row) => {
                     if !editor.apply() {

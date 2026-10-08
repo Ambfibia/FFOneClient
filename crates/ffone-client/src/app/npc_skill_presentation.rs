@@ -4,9 +4,8 @@ use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use ffone_client::entity_lifecycle::NetworkNpcSkillEffectEvents0104;
 use ffone_client::native_terrain::NativeHeightmapCollider;
-use ffone_client::world::{
-    AuthoredColliderWorldBounds, AuthoredTriMeshCollider, collider_ground_height_with_bounds,
-};
+use ffone_client::world::{AuthoredColliderWorldBounds, AuthoredTriMeshCollider};
+mod ground;
 use ffone_protocol::NpcSkillSignalKind0104;
 
 #[derive(SystemParam)]
@@ -174,77 +173,30 @@ pub(super) fn present_npc_skills(
                     })
                 })
                 .clone();
-            let colliders = ground
-                .colliders
-                .iter()
-                .filter(|(collider, _, bounds)| {
-                    let (min, max) = bounds.debug_bounds();
-                    !collider.is_trigger()
-                        && min.x <= position.x + scale * 0.5
-                        && max.x >= position.x - scale * 0.5
-                        && min.z <= position.z + scale * 0.5
-                        && max.z >= position.z - scale * 0.5
-                        && min.y <= position.y + 1.0
-                        && max.y >= position.y - 8.0
-                })
-                .collect::<Vec<_>>();
-            let mut vertices = Vec::new();
-            let mut uv = Vec::new();
-            let mut indices = Vec::new();
-            const N: u32 = 16;
-            for z in 0..=N {
-                for x in 0..=N {
-                    let u = x as f32 / N as f32;
-                    let v = z as f32 / N as f32;
-                    let px = position.x + (u - 0.5) * scale;
-                    let pz = position.z + (v - 0.5) * scale;
-                    let terrain_y = ground
-                        .terrain
-                        .iter()
-                        .filter_map(|(terrain, global)| {
-                            terrain.ground_height(
-                                global,
-                                px,
-                                pz,
-                                position.y - 8.0,
-                                position.y + 1.0,
-                            )
-                        })
-                        .max_by(f32::total_cmp);
-                    let mesh_y = colliders
-                        .iter()
-                        .filter_map(|(collider, global, bounds)| {
-                            collider_ground_height_with_bounds(
-                                collider,
-                                global.to_matrix(),
-                                bounds,
-                                px,
-                                pz,
-                                position.y - 8.0,
-                                position.y + 1.0,
-                            )
-                        })
-                        .max_by(f32::total_cmp);
-                    let y = terrain_y
-                        .into_iter()
-                        .chain(mesh_y)
-                        .max_by(f32::total_cmp)
-                        .unwrap_or(position.y);
-                    vertices.push([px, y + if mesh_y == Some(y) { 0.07 } else { 0.05 }, pz]);
-                    uv.push([1.0 - u, v]);
-                    if x < N && z < N {
-                        let a = z * (N + 1) + x;
-                        indices.extend_from_slice(&[
-                            a,
-                            a + N + 1,
-                            a + 1,
-                            a + 1,
-                            a + N + 1,
-                            a + N + 2,
-                        ]);
-                    }
+            let (mut vertices, mut uv, mut indices) = (Vec::new(), Vec::new(), Vec::new());
+            for (terrain, global) in &ground.terrain {
+                if let Some(mesh) = meshes.get(terrain.source_mesh()) {
+                    ground::append_surface(mesh, global, position, scale, None,
+                        &mut vertices, &mut uv, &mut indices);
                 }
             }
+            // Mesh ground can climb within the footprint too; the old +1 m
+            // ceiling discarded the uphill half of the warning.
+            let height_band = (position.y - 8.0, position.y + (scale * 0.5).max(1.0));
+            for (collider, global, bounds) in &ground.colliders {
+                let (min, max) = bounds.debug_bounds();
+                if !collider.is_trigger()
+                    && min.x <= position.x + scale * 0.5 && max.x >= position.x - scale * 0.5
+                    && min.z <= position.z + scale * 0.5 && max.z >= position.z - scale * 0.5
+                    && min.y <= height_band.1 && max.y >= height_band.0
+                    && let Some(mesh) = meshes.get(collider.source_mesh())
+                {
+                    ground::append_surface(mesh, global, position, scale, Some(height_band),
+                        &mut vertices, &mut uv, &mut indices);
+                }
+            }
+            if indices.is_empty() { continue; }
+            let vertex_count = vertices.len();
             let mesh = Mesh::new(
                 PrimitiveTopology::TriangleList,
                 RenderAssetUsages::default(),
@@ -252,7 +204,7 @@ pub(super) fn present_npc_skills(
             .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
             .with_inserted_attribute(
                 Mesh::ATTRIBUTE_NORMAL,
-                vec![[0.0, 1.0, 0.0]; ((N + 1) * (N + 1)) as usize],
+                vec![[0.0, 1.0, 0.0]; vertex_count],
             )
             .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
             .with_inserted_indices(Indices::U32(indices));

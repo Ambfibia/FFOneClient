@@ -183,6 +183,13 @@ pub struct WorldZiplineTraversal {
 }
 
 #[derive(Component, Clone, Debug)]
+pub struct WorldLauncherTraversal {
+    pub horizontal_velocity: Vec3,
+    pub packet_elapsed: f32,
+    pub upward_pose: bool,
+}
+
+#[derive(Component, Clone, Debug)]
 pub struct WorldRopeTraversal {
     pub points: Vec<Vec3>,
     pub speed: f32,
@@ -664,6 +671,11 @@ impl Plugin for WorldBehaviourPlugin {
                     .after(process_world_trigger_uses)
                     .after(crate::movement::LegacyMovementSet::Simulate)
                     .before(crate::world::NativeWorldSet::ResolveCollision),
+                finish_world_zipline_steps
+                    .after(update_world_zipline_traversals)
+                    .after(crate::world::NativeWorldSet::ResolveCollision)
+                    .before(crate::movement::LegacyMovementSet::CameraPose)
+                    .before(crate::avatar_action::LegacyAvatarActionSet::VisualFeedback),
                 update_world_rope_traversals
                     .after(process_world_trigger_uses)
                     .after(crate::movement::LegacyMovementSet::Simulate)
@@ -673,6 +685,9 @@ impl Plugin for WorldBehaviourPlugin {
                     .after(crate::movement::LegacyMovementSet::Simulate)
                     .before(crate::world::NativeWorldSet::ResolveCollision),
                 finish_unsupported_world_slopes
+                    .after(crate::world::NativeWorldSet::ResolveCollision),
+                update_world_launcher_traversals
+                    .after(consume_world_launcher_outbox)
                     .after(crate::world::NativeWorldSet::ResolveCollision),
                 activate_world_jumppads.after(crate::world::NativeWorldSet::ResolveCollision),
                 update_world_belts.after(crate::world::NativeWorldSet::ResolveCollision),

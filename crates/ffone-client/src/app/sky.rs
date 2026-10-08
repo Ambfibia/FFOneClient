@@ -287,6 +287,7 @@ pub(super) fn ensure_and_update_legacy_skybox(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     catalog: Res<NativeWorldCatalog>,
+    square_settings: Query<(&ffone_client::world::NativeWorldSceneRoot,&ffone_client::world::NativeSquareSettings)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     cameras: Query<
@@ -355,7 +356,9 @@ pub(super) fn ensure_and_update_legacy_skybox(
         .get(orbit.target)
         .map(|transform| transform.translation)
         .unwrap_or(camera_transform.translation);
-    let zone = legacy_sky_zone(position);
+    let zone = match square_settings.iter().find(|(root,_)|root.tile==ffone_client::world::square_at(position)).map(|(_,s)|s.skybox.as_str()) {
+        Some("past")=>LegacySkyZone::Past,Some("future")=>LegacySkyZone::Future,_=>legacy_sky_zone(position)
+    };
     let ambience = catalog.applied_ambience(camera_transform.translation, true);
     let tint = legacy_sky_shader_tint(ambience.fog_color, ambience.light_color);
 

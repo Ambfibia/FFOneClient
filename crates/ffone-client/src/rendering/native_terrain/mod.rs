@@ -29,6 +29,7 @@ use bevy::{
 };
 use image::{ColorType, DynamicImage, ImageFormat};
 use serde::Deserialize;
+mod editing;
 
 use crate::world::{NativeWorldColliderStatus, NativeWorldSceneEntity};
 
@@ -114,6 +115,15 @@ pub use terrain_native_heightmap_collider::{
     LEGACY_TERRAIN_SHADER_EVIDENCE
 };
 pub(crate) use terrain_native_heightmap_collider::install_native_terrain;
+
+/// Installs native terrain presentation for standalone authoring/preview apps.
+/// Gameplay installs the same systems through `NativeWorldPlugin`.
+pub struct NativeTerrainPlugin;
+impl Plugin for NativeTerrainPlugin {
+    fn build(&self, app: &mut App) {
+        install_native_terrain(app);
+    }
+}
 use terrain_materialize_native_terrain_grass::{
     prepare_pending_native_terrain_grass, materialize_native_terrain_grass, terrain_material_uniform
 };

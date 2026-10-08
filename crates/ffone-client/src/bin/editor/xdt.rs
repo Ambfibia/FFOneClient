@@ -12,6 +12,8 @@ mod mission_fields;
 mod mission_workspace;
 #[path = "xdt/mission_commands.rs"]
 mod mission_commands;
+#[path = "xdt/mission_order.rs"]
+mod mission_order;
 #[path = "xdt/mission_canvas.rs"]
 mod mission_canvas;
 #[path = "xdt/mission_inline.rs"]
@@ -32,6 +34,24 @@ mod mission_dependencies;
 mod mission_scene;
 #[path = "xdt/mission_text.rs"]
 mod mission_text;
+#[path = "xdt/mission_events.rs"]
+mod mission_events;
+#[path = "xdt/mission_visibility.rs"]
+mod mission_visibility;
+#[path = "xdt/mail_fields.rs"]
+mod mail_fields;
+#[path = "xdt/string_context.rs"]
+mod string_context;
+#[path = "xdt/mission_publish.rs"]
+mod mission_publish;
+#[path = "xdt/working_copy.rs"]
+mod working_copy;
+#[path = "xdt/npc_templates.rs"]
+mod npc_templates;
+#[path="xdt/npc_inspector.rs"]
+mod npc_inspector;
+#[path = "xdt/mission_server.rs"]
+mod mission_server;
 #[cfg(test)]
 #[path = "xdt/mission_tests.rs"]
 mod mission_tests;
@@ -48,6 +68,8 @@ mod mission_reward;
 mod input;
 #[path = "xdt/model.rs"]
 mod model;
+#[path = "xdt/sections.rs"]
+mod sections;
 #[path = "xdt/sorting.rs"]
 mod sorting;
 use sorting::SortKey;
@@ -79,13 +101,18 @@ impl Plugin for XdtPlugin {
         app.add_systems(
             Update,
             (
+                npc_inspector::select.after(handle_editor_buttons),
                 input::buttons.in_set(XdtInput),
+                sync_section,
+                mission_server::poll,
                 mission_pointer::pointer,
                 input::keyboard,
                 input::drag,
                 input::scroll,
                 input::clamp_viewport,
+                input::remember_field_scroll,
                 view::draw,
+                npc_inspector::draw,
                 mission_canvas::redraw,
                 view::hover,
             )
@@ -109,10 +136,14 @@ impl Plugin for XdtPlugin {
 #[derive(Resource)]
 pub(super) struct XdtEditor {
     path: PathBuf,
+    publication: Option<mission_publish::Publication>,
+    server_job: Option<mission_server::SelectionJob>,
     base: Value,
     document: Value,
     tables: Vec<Table>,
     table: usize,
+    table_tab: Option<sections::Navigation>,
+    mission_tab: Option<sections::Navigation>,
     row: Option<usize>,
     columns: Vec<String>,
     filtered: Vec<usize>,
@@ -158,6 +189,14 @@ pub(super) struct XdtEditor {
     graph_zoom: f32,
     graph_all: bool,
     workspace: mission_workspace::Workspace,
+    saved_work: Option<working_copy::Snapshot>,
+}
+
+fn sync_section(editor: Res<XdtEditor>, mut state: ResMut<EditorState>) {
+    if state.xdt_open {
+        let missions = editor.mission_workspace_table().is_some();
+        if state.missions_open != missions { state.missions_open = missions; }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -178,6 +217,9 @@ struct Root;
 struct ScrollRegion(u8);
 #[derive(Component, Clone)]
 enum Action {
+    MobLevels,
+    MobLevel(i64),
+    MobStats(usize),
     Mission(mission_workspace::Command),
     Table(usize),
     Row(usize),
@@ -185,6 +227,7 @@ enum Action {
     Field(Focus),
     Sort(SortKey),
     Save,
+    Rewrite,
     Undo,
     Redo,
     Add,
@@ -235,17 +278,51 @@ struct ActiveText;
 struct Track(u8);
 
 impl XdtEditor {
+    pub(super) fn object_npc_types(&self) -> BTreeSet<i64> {
+        let rows = |suffix: &str| {
+            self.tables.iter().find(|table| table.label.ends_with(suffix))
+                .and_then(|table| self.document.pointer(&table.pointer))
+                .and_then(Value::as_array)
+        };
+        let Some(meshes) = rows("/m_pNpcMeshData") else { return BTreeSet::new(); };
+        rows("/m_pNpcTable/m_pNpcData").into_iter().flatten().filter_map(|row| {
+            let mesh = usize::try_from(row["m_iMesh"].as_i64()?).ok()?;
+            let name = meshes.get(mesh)?["m_pstrMMeshModelString"].as_str()?;
+            name.eq_ignore_ascii_case("ObjectNPC1").then(|| row["m_iNpcNumber"].as_i64()).flatten()
+        }).collect()
+    }
+    pub(super) fn npc_map_icons(&self) -> BTreeMap<i64, i32> {
+        self.tables.iter().find(|t|t.label.ends_with("/m_pNpcTable/m_pNpcData"))
+            .and_then(|t|self.document.pointer(&t.pointer)).and_then(Value::as_array)
+            .into_iter().flatten().filter_map(|row| {
+                let npc=row["m_iNpcNumber"].as_i64()?;
+                let icon=i32::try_from(row["m_iMapIcon"].as_i64()?).ok()?;
+                (npc>0).then_some((npc,icon))
+            }).collect()
+    }
+    pub(super) fn has_npc_type(&self, id: i64) -> bool {
+        self.tables.iter().find(|t|t.label.ends_with("/m_pNpcTable/m_pNpcData"))
+            .and_then(|t|self.document.pointer(&t.pointer)).and_then(Value::as_array)
+            .is_some_and(|rows|rows.iter().any(|r|r["m_iNpcNumber"].as_i64()==Some(id)))
+    }
+    pub(super) fn server_folder(&self) -> Option<PathBuf> {
+        self.publication.as_ref().and_then(|p| p.path.parent()).map(Path::to_path_buf)
+    }
     pub(super) fn open(root: PathBuf) -> Self {
         let path = root.join(ffone_client::assets::TABLE_SET_PATH);
         let loaded = read(&path);
         let status = loaded.as_ref().err().cloned().unwrap_or_default();
         let document = loaded.unwrap_or(Value::Null);
         let mut editor = Self {
+            publication: mission_publish::Publication::discover(&root),
+            server_job: None,
             path,
             base: document.clone(),
             document,
             tables: Vec::new(),
             table: 0,
+            table_tab: None,
+            mission_tab: None,
             row: None,
             columns: Vec::new(),
             filtered: Vec::new(),
@@ -291,12 +368,17 @@ impl XdtEditor {
             graph_zoom: 1.,
             graph_all: false,
             workspace: mission_workspace::Workspace::load(&root),
+            saved_work: None,
         };
+        if !editor.document.is_null() {
+            if let Err(error) = editor.restore_work() { editor.status = error; }
+        }
         editor.discover();
         editor
     }
     fn dirty(&self) -> bool {
-        self.document != self.base || !self.workspace.locale_drafts.is_empty()
+        self.saved_work.as_ref().map_or_else(|| self.unpublished(), |saved|
+            self.document != saved.document || self.workspace.locale_drafts != saved.locale_drafts)
     }
     pub(super) fn hnpc_value(&self) -> Option<&Value> {
         if !self.tables.get(self.table)?.label.ends_with("/m_pNpcTable/m_pNpcData") { return None; }
@@ -655,12 +737,12 @@ impl XdtEditor {
                         .and_then(|row| row.get(&field))
                         .ok_or("Missing field")?;
                     let value = parse_cell(old, &self.edit)
-                        .map_err(|_| format!("{field}: {}", schema::type_error(old)))?;
+                        .map_err(|_| schema::task_error(&rows[row], format!("{field}: {}", schema::type_error(old))))?;
                     if value != *old {
                         if let Some(error) =
                             schema::invalid(&self.tables[self.table].label, &field, &value)
                         {
-                            return Err(format!("{field}: {error}"));
+                            return Err(schema::task_error(&rows[row], format!("{field}: {error}")));
                         }
                     }
                     rows[row][field] = value;
@@ -698,7 +780,8 @@ impl XdtEditor {
             }
         }
     }
-    fn change(&mut self, rows: Vec<Value>) -> Result<(), String> {
+    fn change(&mut self, mut rows: Vec<Value>) -> Result<(), String> {
+        if self.mission_table() { mission_visibility::propagate(self.rows(), &mut rows)?; }
         let Some(table) = self.tables.get(self.table) else {
             return Err("No table".into());
         };
@@ -710,13 +793,13 @@ impl XdtEditor {
                 if row.get(*field).is_none()
                     && (old.is_none() || old.is_some_and(|r| r.get(*field).is_some()))
                 {
-                    return Err(format!("Required parameters: {field}"));
+                    return Err(schema::task_error(row, format!("Required parameters: {field}")));
                 }
             }
             for (field, value) in row.as_object().into_iter().flatten() {
                 if old.and_then(|r| r.get(field)) != Some(value) {
                     if let Some(error) = schema::invalid(&table.label, field, value) {
-                        return Err(format!("{field}: {error}"));
+                        return Err(schema::task_error(row, format!("{field}: {error}")));
                     }
                 }
             }
@@ -808,29 +891,35 @@ impl XdtEditor {
         self.rebuild_links();
         self.revision += 1;
     }
-    fn save(&mut self) -> Result<(), String> {
+    fn rewrite(&mut self) -> Result<(), String> {
+        self.enable_edited_nanocom();
+        self.sync_mission_text_links();
+        // Preserve the current work even if publication validation or writing fails.
+        self.save()?;
         let locales=self.prepare_locales()?;
         self.validate_document_change(&self.base, &self.document)?;
         let disk = read(&self.path)?;
         let merged = merge_document(&self.base, &self.document, &disk)?;
         self.validate_document_change(&self.base, &merged)?;
-        let mut temp = tempfile::NamedTempFile::new_in(self.path.parent().unwrap())
-            .map_err(|e| e.to_string())?;
+        mission_publish::validate_tasks(&self.base, &merged)?;
+        let waypoint = self.prepare_waypoints(&merged)?;
         let published = ffone_client::xdt::into_server_document(merged.clone())?;
-        serde_json::to_writer_pretty(&mut temp, &published).map_err(|e| e.to_string())?;
-        temp.write_all(b"\n").map_err(|e| e.to_string())?;
-        temp.as_file().sync_all().map_err(|e| e.to_string())?;
-        temp.persist(&self.path).map_err(|e| e.to_string())?;
+        self.publish_files(&published, &locales, waypoint)?;
         if merged != self.document {
             self.undo.clear();
             self.redo.clear();
         }
         self.base = merged.clone();
         self.document = merged;
-        self.save_locales(locales)?;
+        for (index, (_, value)) in locales.into_iter().enumerate() {
+            self.workspace.locale_base[index] = value["entries"].as_object().unwrap().iter()
+                .filter_map(|(k,v)| v.as_str().map(|v| (k.clone(), v.into()))).collect();
+        }
+        self.workspace.locale_drafts.clear();
+        self.save()?;
         self.discover();
         self.reload_models = true;
-        self.status = "Saved".into();
+        self.status = if self.publication.is_some() { "Saved to client and server; restart the server" } else { "Saved; server TableData was not found" }.into();
         self.revision += 1;
         Ok(())
     }

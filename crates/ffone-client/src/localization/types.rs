@@ -1,5 +1,9 @@
 use super::*;
 
+/// Editable fields retain their font metrics and reveal the caret by scrolling.
+#[derive(Component)]
+pub struct UiTextNoAutoFit;
+
 /// Shrinks a bounded UI text block only when its translated copy does not fit.
 ///
 /// The source rectangle remains authoritative: this component changes the

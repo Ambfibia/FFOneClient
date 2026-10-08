@@ -118,6 +118,7 @@ pub(super) struct LoginGLayoutFlexibleSpace;
 pub(super) fn update_login_layout(
     windows: Query<&Window, With<PrimaryWindow>>,
     option_ui: Res<OptionUiModel>,
+    model: Option<Res<LoginUiModel>>,
     mut fallback_background: Single<
         &mut Node,
         (
@@ -142,6 +143,9 @@ pub(super) fn update_login_layout(
             Without<LoginLoadedBackground>,
         ),
     >,
+    mut actions: Query<(&mut Node, Has<LoginSubmitButton>, Has<LoginLanguageButton>),
+        (Or<(With<LoginSubmitButton>, With<LoginLanguageButton>, With<LoginGLayoutArea>)>,
+         Without<LoginPanel>, Without<LoginFallbackBackground>, Without<LoginLoadedBackground>)>,
 ) {
     let Ok(window) = windows.single() else {
         return;
@@ -156,7 +160,15 @@ pub(super) fn update_login_layout(
         .expect("ScaleAndCrop always has a source rectangle");
     apply_resolved_rect(&mut loaded_background, loaded);
 
-    let panel_origin = (viewport - LOGIN_PANEL_SIZE) * 0.5;
+    let extended = model.as_ref().is_some_and(|m| m.visible);
+    let height = LOGIN_PANEL_SIZE.y + if extended {24.0} else {0.0};
+    let panel_origin = (viewport - Vec2::new(LOGIN_PANEL_SIZE.x, height)) * 0.5;
+    panel.0.height = px(height);
+    for (mut node, submit, language) in &mut actions {
+        let top = if submit { LOGIN_SUBMIT_RECT.y } else if language { LOGIN_LANGUAGE_RECT.y }
+            else { LOGIN_LANGUAGE_RECT.y + LOGIN_LANGUAGE_RECT.height + 8.0 };
+        node.top = px(top + if extended {24.0} else {0.0});
+    }
     panel.0.left = px(panel_origin.x);
     panel.0.top = px(panel_origin.y);
     panel.1.scale = Vec2::splat(login_ui_scale(

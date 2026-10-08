@@ -49,7 +49,7 @@ fn published_variants_produce_valid_isolated_runtime_preview_and_native_document
     let before = editor.base.clone();
     let original = editor.original.as_ref().unwrap().clone();
     let option = *editor
-        .choices("hair")
+        .choices("shirt")
         .iter()
         .find(|i| {
             editor.draft["parts"]
@@ -97,11 +97,11 @@ fn published_variants_produce_valid_isolated_runtime_preview_and_native_document
             .unwrap()
             .parts
             .iter()
-            .find(|p| p.kind == NativePlayerPartKind::Hair)
+            .find(|p| p.kind == NativePlayerPartKind::Shirt)
             .unwrap(),
         look.parts
             .iter()
-            .find(|p| p.kind == NativePlayerPartKind::Hair)
+            .find(|p| p.kind == NativePlayerPartKind::Shirt)
             .unwrap()
     );
     assert!(
@@ -126,4 +126,37 @@ fn published_variants_produce_valid_isolated_runtime_preview_and_native_document
     let draft=editor.draft.clone();
     let hair=editor.choices("hair")[0];editor.variants[hair].caption="Причёска 🔥".into();editor.filter="ПРИЧЁСКА".into();
     assert!(editor.choices("hair").contains(&hair));assert_eq!(editor.draft,draft);
+    editor.filter.clear();
+    for kind in ["shirt","pants","shoes","hat","glasses","back","rightWeapon"] {
+        let choices=editor.choices(kind);
+        let option=*choices.iter().find(|i|editor.variants[**i].caption.contains("· ID ")&&(kind!="hat"||editor.variants[**i].value["equipType"]==0)).expect("player inventory wardrobe variant");
+        editor.choose(option).unwrap();
+    }
+    assert!(editor.choices("shirt").len()>50);
+    let (index,next)=publish_document(&editor.base,&editor.draft,&editor.base,148,false).unwrap();
+    let loaded=HnpcRuntimeCatalog::from_json(&locator,original.rig_catalog(),next).unwrap();
+    assert_eq!(loaded.appearance(index).unwrap().look.as_ref().unwrap().parts.iter().filter(|p|matches!(p.kind,NativePlayerPartKind::Shirt|NativePlayerPartKind::Pants|NativePlayerPartKind::Shoes|NativePlayerPartKind::Hat|NativePlayerPartKind::Glasses|NativePlayerPartKind::Back|NativePlayerPartKind::Weapon)).count(),7);
+    let face=editor.choices("face")[0];editor.choose(face).unwrap();editor.choose(hair).unwrap();
+    for equip_type in 0..=4 {
+        let hat=*editor.choices("hat").iter().find(|i|editor.variants[**i].value["equipType"]==equip_type).expect("player hat policy variant");
+        editor.choose(hat).unwrap();let look=editor.look().unwrap();
+        let policy=ffone_client::character_creation_data::LegacyHatPolicy::from_equip_type(equip_type).unwrap();
+        assert_eq!(look.parts.iter().any(|p|p.kind==NativePlayerPartKind::Hair),policy.hair_variant.is_some());
+        assert_eq!(look.parts.iter().any(|p|p.kind==NativePlayerPartKind::Glasses),policy.glasses_visible);
+        assert!(look.parts.iter().find(|p|p.kind==NativePlayerPartKind::Face).unwrap().exact_route.contains(&format!("_type{:02}",policy.face_variant)));
+        let (index,next)=publish_document(&editor.base,&editor.draft,&editor.base,148,false).unwrap();
+        let reopened=HnpcRuntimeCatalog::from_json(&locator,original.rig_catalog(),next).unwrap();
+        let reopened_parts=&reopened.appearance(index).unwrap().look.as_ref().unwrap().parts;
+        assert_eq!(reopened_parts.len(),look.parts.len());
+        for (actual,expected) in reopened_parts.iter().zip(&look.parts) {
+            // Accepted NPC texture aliases can have different paths from the
+            // inventory copy; compare verified image content and model parts.
+            let summary=|p:&NativePlayerPartLook|format!("{:?} {:?} {} {} {:?} {:?}",p.kind,p.assembly,p.exact_route,p.glb,p.primary_texture.as_ref().map(|t|&t.contract.native_png_sha256),p.secondary_texture.as_ref().map(|t|&t.contract.native_png_sha256));
+            assert_eq!(summary(actual),summary(expected),"Hat policy {equip_type} changes the saved visual");
+        }
+    }
+    editor.draft["parts"].as_array_mut().unwrap().retain(|p|p["kind"]!="hat");
+    let restored=editor.look().unwrap();
+    assert!(restored.parts.iter().any(|p|p.kind==NativePlayerPartKind::Hair));
+    assert!(restored.parts.iter().any(|p|p.kind==NativePlayerPartKind::Glasses));
 }

@@ -30,6 +30,8 @@ pub(super) fn extract_missions(
             title_string_id: required_i32(row, "m_iHMissionName", &context)?,
             objective_string_id: required_i32(row, "m_iHCurrentObjective", &context)?,
             mission_type: required_i32(row, "m_iHMissionType", &context)?,
+            marker_visibility: MissionMarkerVisibility::from_code(optional_i32(row,"m_iHMissionVisibility",&context)?.unwrap_or(0))
+                .ok_or_else(||invalid(format!("{context}.m_iHMissionVisibility must be 0..3")))?,
             nano_id: required_i32(row, "m_iSTNanoID", &context)?,
             journal_row_id: required_i32(row, "m_iSTJournalIDAdd", &context)?,
             required_level: required_i32(row, "m_iCTRReqLvMin", &context)?,

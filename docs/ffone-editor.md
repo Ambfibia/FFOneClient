@@ -71,9 +71,157 @@ Reproducible rendering checks can start with `--equipment shirt/1 --female`,
 `--capture target/performance/editor/example.png` writes an image and adjacent
 JSON status including the actual computed search-field size, then exits.
 
-The persistent header has separate NPC, Nano, Equipment, Strings and XDT tabs.
+The persistent header has separate NPC, Nano, Equipment, Strings, XDT, Missions,
+World 2D and World 3D tabs. Missions opens the existing stage workspace directly
+(`cargo editor -- --missions`), with independent selection, search and unfinished
+forms when switching to XDT.
 Each table editor keeps its own draft, selection and search when switching tabs;
 model tabs retain their selected entry and search. The model browser is read-only.
+
+## World placement editing
+
+Open **Мир 2D / World 2D** or **Мир 3D / World 3D**; command-line entry points are
+`--world-2d` and `--world-3d`. Opening either tab, including switching between them,
+reloads published placements and native tile files; unpublished edits are discarded.
+The selected server folder is shared with the mission editor. The editor
+reads `NPCs.json`, `mobs.json`, `eggs.json` and placement overrides in `gruntwork.json`.
+The left side has NPCs, Objects and Nearby tabs. NPC/Mob/Group/Shiny toggles
+control their visibility independently. Objects lists the loaded region with an
+empty search; a keyword (for example, Tree) searches model names across all published
+tiles, and selecting a distant result admits its region. The 2D map shows matching
+objects, nearby objects in object mode and the selected object. Nearby lists objects
+within 100 native metres of the view center. The list also filters by instance
+(`iMapNum`) and by name, type or placement ID. The inspector shows the NPC type ID.
+The inspector edits server X/Y, height Z, angle in degrees and the entity's instance.
+**Choose** below the type ID opens a searchable type menu for NPCs, mobs, groups,
+shiny effects or world models. One click previews the native model; a double click
+or the menu's Choose button applies it. Drag a menu item onto the world to place it.
+World models retain their accepted asset
+IDs and bring their collision parts with them when placed or replaced.
+Missing `iMapNum` remains the main world, 0. Accepted IDs and unknown fields survive.
+
+In 2D, drag with LMB to move an entity in XY and snap it to the terrain. In 3D,
+choose **Edit NPCs** or **Edit objects**.
+Selecting an object from either list also activates object mode. In this mode,
+clicking a rendered 3D model selects it even if it does not match the list keyword.
+LMB dragging moves freely in server XY; Z changes height, X constrains server X
+and C constrains server Y. Holding an axis key displays its coloured arrow.
+RMB on the selected model rotates
+around native Y; Z+RMB rotates objects around native X. Object angles X/Y/Z
+are also editable numerically. Use Q/E for 15-degree turns while the cursor
+is over the world, or enter an exact angle in the inspector. The grid step is in server
+units; 0 disables snapping, and Alt bypasses snapping during a drag. In 2D, RMB/MMB
+pans and the wheel zooms. In 3D, RMB orbits, MMB pans and the wheel changes distance.
+**Focus selection / F** centers the view. Clicking a list name centers the camera;
+double-clicking a placement also brings it closer. **Place in the world** uses an existing
+NPC, mob, group or shiny type; click a destination to place it, or Esc to cancel.
+Clicking an empty point deselects the NPC/object and shows **Selected coordinates**
+in the inspector, with server X/Y/Z and terrain height. A cyan cross marks the
+point in both views; selecting an entity restores its placement controls.
+**Copy coordinates** retains the selected point or entity position. Select a
+destination entity and use **Paste coordinates** to move it there, preserving
+its angle and instance. Moving an object also moves its collision; undo restores
+the complete operation. This buffer is independent from entity copy/paste.
+**Duplicate / Ctrl+D** retains the entity's settings and allocates a new placement ID.
+Undo/Redo treats each drag as one action. Delete removes a placement and its
+owned collision. Ctrl+C/V copies and pastes objects in either view, including
+between map tiles; Ctrl+Z/Y restores or repeats edits. Moving an NPC updates
+its client waypoint in the same history entry, adding a missing waypoint if needed.
+The instance picker includes names for IDs 0–158 and creates new stable IDs;
+new instances are staged in both client and server XDT tables.
+
+The 2D canvas uses the published minimap images as a coordinate-aligned background,
+with square boundaries and tile coordinates (for example, `07_07`) at readable zoom;
+**Entire map** fits the complete map, and wheel zoom stays anchored at the cursor.
+NPCs and mobs use the gameplay minimap artwork selected by their NPC type's
+`m_iMapIcon` in the current XDT draft, including the tutorial's dedicated icons.
+Selection adds an outline and direction indicator without tinting the icon.
+Placements without a declared icon retain a small editable point.
+Invisible NPCs also have an editor-only blue cube in 3D, using the same colour as
+the NPC point marker; their gameplay visibility stays controlled by the XDT type.
+NPC types using **ObjectNPC1** have red point markers and red placeholder cubes.
+In 3D, **Select area on map** opens the same images with native tile boundaries.
+Click an area to load its containing tile and the eight adjacent tiles. At map
+edges only published neighbours load. Changing area hides and unloads the old
+region; zooming the 3D camera does not admit additional tiles. Loading starts with
+the center, allows two background jobs and installs at most one tile per frame.
+**Open nearby map tile** in 2D loads the same 3×3 region around the canvas center.
+Existing map objects can be moved, rotated and duplicated; visual
+and collision parts move together. Tile geometry is shared across server instances.
+Objects with scripted behaviour cannot be moved or duplicated through this inspector
+until their behaviour transforms can be updated in the same transaction.
+**Show collisions** overlays enabled collision meshes, including invisible walls.
+Selecting an object exposes its Collision switch; changing it is saved in the scene
+and affects runtime collision. Disabling it keeps the visual model and supports Undo.
+
+**Square settings** edits the selected square's location name, native music track,
+past/future skybox and terrain shader. The game uses these per-square overrides;
+empty values retain the existing zone settings. Location and music have pickers.
+
+**Terrain editor** provides height, flattening and texture painting brushes.
+**Path textures** filters the current tile's authored palette to road, trail and
+walkway layers. Brush rows show the actual texture thumbnail and source name.
+Radius and strength are editable; Shift lowers the height brush. Flattening
+uses the height at the start of the stroke. Painting blends an existing terrain
+texture layer and keeps all layer weights normalized. Neighbouring loaded tiles
+use the same texture by name when their palettes differ. Mesh and ground
+collision update during the stroke. Each stroke supports Undo/Redo, and Rewrite
+saves the 16-bit heightmap, control maps, mip levels and native reference hashes.
+**Create terrain** adds a native 512×512 square at an empty point on the map.
+It inherits the nearest native palette and environment, matches available neighbour
+edge heights and blends their matching texture weights. Objects in an existing empty
+square are retained. Creation, brush edits and publication support Undo and saved work.
+**Grass** uses the model picker to choose a native world model and stamps instances
+without collision. Radius sets coverage and strength sets the number of plants;
+one continuous stroke is one Undo action.
+
+**Path editor**, next to Terrain editor, has Points and Assignments tabs for NPCs,
+mobs, group leaders, Skyway and Slider routes. New routes receive a free stable ID.
+Click the 2D or 3D world to add ground-snapped points, then Save route. Point
+coordinates, stop ticks, speed and NPC loop mode are editable; route points and
+connections appear in both views. In Assignments, select a placed actor on the
+left and assign the saved route. This stages `iPathID` in its placement and the
+matching template in the server's `paths.json`. RustyFusion consumes this reference
+at spawn and group respawn. Skyway assignments copy a saved route onto an existing
+transport route ID; Slider edits the shared circuit. Rewrite publishes the draft.
+
+**Save work / Ctrl+S** explicitly stores an editor-only backup in
+`assets/editor/world-workspace.json`; **Open backup** restores it on request.
+Opening a world tab does not restore this file automatically. Idle time, closing,
+instance creation and route assignment do not write a world backup.
+**Rewrite** publishes changed server placement
+files and native map files. It checks external changes before writing, preserves
+unknown data and updates the map's byte/BLAKE3 reference closure. Server placements
+take effect after restarting the server. EN/RU labels use the existing editor fonts.
+Before publishing xdt.json, ru.json, en.json, client-npc-waypoints.json, NPCs.json or paths.json,
+the editor keeps the last three distinct prior versions beside each file under
+`.ffone-backups/<filename>/1.bak`, `2.bak`, `3.bak` (newest first). To roll back,
+close the editor, replace the corresponding file with a chosen backup and reopen.
+
+Mission stage menus support choosing any stage number; later stages shift while
+task IDs and transitions remain stable. Double-click an objective title to edit
+its EN/RU text. Start and availability emails have editable cards and popup forms.
+NPC templates include Fusion Spawn mobs; the voice picker selects an existing
+audio prefix or creates a new one. HNPC clothing options include player inventory
+clothes and accessories. Player hats carry their exact equipType: the HNPC preview
+and saved runtime use the player's hair, face-variant and glasses visibility rules.
+The editor keeps hidden wardrobe choices so changing or removing a hat restores them.
+Developer server commands `/startquest <mission ID>` and
+`/deletequest <mission ID>` start a mission or clear its completed flag.
+
+The NPC viewer inspector has **Details**, **Animations** and **Edit** tabs.
+Edit selects the NPC's XDT record by type ID and exposes every authored field,
+including voice selection/creation and HNPC appearance. Its fields, Save work,
+Rewrite and Undo/Redo share the table editor's working document and validation.
+The existing type ID remains visible as identity. LMB in the model preview orbits;
+RMB/MMB pans in the camera's view plane, and the wheel zooms.
+Details also lists placements with server XYZ, instance ID/name and square/location,
+and reports references and world placement usage of the NPC type. In Edit, Duplicate
+keeps its visual settings while allocating a new type ID; Choose level selects a mob
+whose combat parameters can be copied into that draft.
+
+## String editing
+
 The **Strings / Строки** tab edits the native
 English and Russian text bundles. Both views consume ordinary native runtime assets below
 `assets/game` and never open a legacy client, extraction cache, or
@@ -95,6 +243,10 @@ Ctrl+F focuses search. Text editing supports Unicode, Enter, left/right,
 Home/End, Shift selection, Ctrl+A/C/X/V and Ctrl+Z/Y. Shift+click extends selection.
 Escape ends editing. The caret is one pixel wide; selected text has a colored background.
 `--strings --search TEXT` opens the table with a preset search.
+The Text / Mission ID / NPC ID controls choose what the row filter means. Numeric
+context searches include linked dialogue, emails, quest items and NPC/mob names,
+including technical strings. Rows with a unique NPC speaker show its portrait beside
+the checkbox. Searching dialogue in Missions also finds the stages using that text.
 
 External changes are checked every two seconds while this tab is open;
 focused drafts are merged on save. English owns the key set: new keys receive
@@ -275,6 +427,24 @@ summary/description and array index, including EN/RU search. The adjacent + crea
 journal entry with all six text references, each allowing nested text creation.
 Nested creation, translations and the final link are one Undo operation.
 
+Identification includes mission secrecy (`m_iHMissionVisibility`, a native XDT
+extension): 0 ordinary shows markers everywhere, 1 semi-secret shows them only on
+the minimap, 2 exploration shows them only above NPCs, and 3 secret hides them on
+all three surfaces. Missing values mean ordinary. Changing secrecy updates all
+stages of that mission in one Undo operation; task availability and NPC interaction
+remain independent of marker visibility.
+
+Start, completion and failure Message Type controls label bit 2 as Nano-Com and
+bit 4 as E-mail; 6 sends both. The Retrobution mission message handler does not
+consume bit 1: type 1 triggers neither channel, while type 3 triggers Nano-Com
+with that extra flag preserved. Unknown authored flags are retained. Choosing a
+channel explicitly takes precedence over automatic channel selection when editing
+message text.
+For type 6, separate Email text/sender fields and cards coexist with the Nano-Com
+fields at start, completion and failure. Missing email overrides retain the shared
+legacy message. The native mailbox's start-mail projection uses the independent
+start fields after Rewrite.
+
 Stage cards show the authored objective and only populated gameplay goals, including
 NPC/item IDs, counts and matched quest-item drop rates. Journal, NanoCom and overhead
 speech previews follow in event order: start, completion, then configured failure.
@@ -376,12 +546,22 @@ field. This preserves nulls, empty strings, arrays, objects and multiline text.
 Import validates all rows before applying one undo step and rejects changes
 made to the table while its dialog was open. It does not save automatically.
 
-Save / Ctrl+S atomically replaces the native document after a three-way merge
-with external edits. Conflicts leave both disk and draft intact. Reload refreshes
-from disk; discarding changes requires a second click. Closing saves valid
-pending edits and stays open on an error. Drafts live in memory. Restart the
-game after saving to reload gameplay catalogs. Model viewers refresh from the saved
-tables when next opened, preserving the current outfit and selected semantic entry.
+Save / Ctrl+S writes the working document and its pending EN/RU edits atomically
+to `assets/editor/xdt-workspace.json`, without changing gameplay files. Reopening
+restores that work, including the original data used for external conflict checks.
+Closing also saves work only and stays open on a write error. The mission toolbar
+and table view both expose **Rewrite** as the explicit action that applies changes
+to client tables, selected server tables, localization and mission destinations.
+Rewrite saves the work first, then validates and merges external edits before
+publishing. A failed publication retains saved work for correction and retry.
+XDT is serialized once for both destinations. Identical accepted data keeps the
+existing client bytes; unchanged files are skipped, including backup rotation.
+Editing mission text updates its canonical string and linked semantic EN/RU keys,
+even when its string ID stays the same. Opening a text form prefers its saved
+localization; a concurrently saved translation has priority over an older draft.
+Reload discards pending work after a second click, including saved but unpublished
+changes. Restart the game/server after Rewrite to load the changes. Model viewers
+refresh from published tables when next opened, preserving outfit and selection.
 
 
 ## Icon generator

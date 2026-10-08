@@ -11,10 +11,14 @@ use equipment::*;
 mod strings;
 #[path = "../editor/xdt.rs"]
 mod xdt;
+#[path = "../editor/backups.rs"]
+mod backups;
 #[path = "../editor/hnpc.rs"]
 mod hnpc;
 #[path = "../editor/icon_generator.rs"]
 mod icon_generator;
+#[path = "../editor/world_editor.rs"]
+mod world_editor;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -126,9 +130,27 @@ fn main() {
         .rig_catalog()
         .clone();
 
-    let xdt_editor=xdt::XdtEditor::open(asset_root.clone()).with_selection(
+    let mut xdt_editor=xdt::XdtEditor::open(asset_root.clone()).with_selection(
         arguments.xdt_table.as_deref(),arguments.xdt_row,&arguments.search,
     ).with_graph(env::args().any(|arg|arg=="--mission-graph"));
+    if env::args().any(|arg| arg == "--missions") || initial.missions_open {
+        initial.xdt_open = true;
+        initial.strings_open = false;
+        initial.missions_open = true;
+        initial.world_open = None;
+        xdt_editor.open_missions();
+    }
+    for (flag, three_d) in [("--world-2d", false), ("--world-3d", true)] {
+        if env::args().any(|arg| arg == flag) {
+            initial.world_open = Some(three_d);
+            initial.xdt_open = false;
+            initial.strings_open = false;
+        }
+    }
+    if env::args().any(|arg| matches!(arg.as_str(), "--npc" | "--nano" | "--equipment" | "--strings" | "--xdt" | "--hnpc-appearance" | "--icon-generator")) {
+        initial.world_open = None;
+        initial.missions_open = false;
+    }
     let mut hnpc_editor=hnpc::HnpcEditor::default();
     if env::args().any(|arg|arg=="--hnpc-appearance") {
         hnpc_editor.open(&asset_root.join(ffone_client::assets::TABLE_SET_PATH),xdt_editor.hnpc_value().expect("select an NPC table row"),&catalog).expect("open native HNPC appearance");
@@ -171,7 +193,7 @@ fn main() {
                     close_when_requested: false,
                     primary_window: Some(Window {
                         visible: arguments.capture.is_none(),
-                        title: "FFOneClient Editor — XDT NPC & Nano".to_owned(),
+                        title: "FFOneClient Editor — Missions & World".to_owned(),
                         resolution: if arguments.compact {
                             WindowResolution::new(1180, 720)
                         } else {
@@ -219,6 +241,7 @@ fn main() {
         .add_plugins(xdt::XdtPlugin)
         .add_plugins(hnpc::HnpcEditorPlugin)
         .add_plugins(icon_generator::IconGeneratorPlugin::new(asset_root.clone()))
+        .add_plugins(world_editor::WorldEditorPlugin::new(asset_root.clone()))
         .add_systems(Startup, (setup_scene, setup_editor_ui))
         .add_systems(
             Update,
@@ -289,7 +312,7 @@ use assets_editor_catalog::{
 };
 #[cfg(test)]
 use assets_editor_catalog::{CharacterRegistryDocument, catalog_scroll_thumb};
-use commands::EditorAction;
+use commands::{EditorAction, NpcInspectorTab};
 use constants::{
     CONSOLIDATED_TABLE, EDITOR_BODY_GAP, EDITOR_BODY_PADDING_X, EDITOR_BODY_PADDING_Y,
     EDITOR_HEADER_HEIGHT, EDITOR_INSPECTOR_WIDTH, EDITOR_PLAYBACK_HEIGHT, EDITOR_UI_CAMERA_ORDER,
@@ -316,4 +339,5 @@ use systems::{sync_preview_camera_viewport, update_orbit_camera};
 use types::{
     DynamicTextRole, EditorArguments, EditorButtonLabel, EditorButtonSkin, EditorCapture,
     EditorFonts, OrbitCamera, PreparedAnimations, PreviewCamera, PreviewRoot, TimelineFill,
+    NpcInspectorTabs, NpcEditSection,
 };

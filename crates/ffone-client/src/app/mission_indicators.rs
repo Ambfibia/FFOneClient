@@ -125,16 +125,19 @@ impl Default for WorldMissionIndicatorRuntime {
 pub(super) fn tutorial_npc_mission_symbol(
     actor: &TutorialActor,
     mission: &TutorialMissionRuntime,
+    content:&TutorialMissionContent,
+    surface:ffone_client::tutorial_mission_content::MissionMarkerSurface,
 ) -> Option<MinimapMissionSymbol> {
-    match actor.npc_type {
-        2671 if mission.task_is_active(2249) => Some(MinimapMissionSymbol::Advance),
+    let (task,symbol)=match actor.npc_type {
+        2671 if mission.task_is_active(2249) => (2249,MinimapMissionSymbol::Advance),
         2671 if !mission.task_is_active(2248) && !mission.completed_tasks.contains(&2248) => {
-            Some(MinimapMissionSymbol::New)
+            (2248,MinimapMissionSymbol::New)
         }
-        2672 if mission.task_is_active(2250) => Some(MinimapMissionSymbol::Advance),
-        2673 if mission.task_is_active(2253) => Some(MinimapMissionSymbol::Advance),
-        _ => None,
-    }
+        2672 if mission.task_is_active(2250) => (2250,MinimapMissionSymbol::Advance),
+        2673 if mission.task_is_active(2253) => (2253,MinimapMissionSymbol::Advance),
+        _ => return None,
+    };
+    content.mission(task).ok().filter(|definition|definition.provenance.marker_visibility.visible_on(surface)).map(|_|symbol)
 }
 
 pub(super) const fn tutorial_minimap_marker_icon(
@@ -173,6 +176,7 @@ pub(super) fn tutorial_selected_waypoint_npc_types(
         .iter()
         .filter_map(|task_id| content.mission(*task_id).ok())
         .filter(|definition| definition.provenance.mission_id == selected_mission_id)
+        .filter(|definition|definition.provenance.marker_visibility.visible_on(ffone_client::tutorial_mission_content::MissionMarkerSurface::Overhead))
         .map(|definition| definition.provenance.grant_waypoint_npc_type)
         .filter(|npc_type| *npc_type > 0)
         .collect()
@@ -262,12 +266,14 @@ pub(super) fn tutorial_actor_smart_indicator_scale(
 pub(super) fn active_world_mission_waypoint_tasks(
     mission: &WorldMissionRuntime,
     content: &TutorialMissionContent,
+    surface:ffone_client::tutorial_mission_content::MissionMarkerSurface,
 ) -> Vec<ActiveMissionWaypointTask> {
     mission
         .active_tasks()
         .iter()
         .filter_map(|active| {
             let definition = content.mission(active.task_id).ok()?;
+            if !definition.provenance.marker_visibility.visible_on(surface){return None;}
             Some(ActiveMissionWaypointTask {
                 task_id: active.task_id,
                 mission_id: definition.provenance.mission_id,
@@ -283,7 +289,7 @@ pub(super) fn sync_world_mission_waypoint(
     catalog: Res<ClientNpcWaypointCatalog>,
     mut presentation: ResMut<WorldMissionWaypointRuntime>,
 ) {
-    let active_tasks = active_world_mission_waypoint_tasks(&mission, &content);
+    let active_tasks = active_world_mission_waypoint_tasks(&mission, &content,ffone_client::tutorial_mission_content::MissionMarkerSurface::Minimap);
     let projection =
         project_selected_mission_waypoints(mission.selected_mission_id(), &active_tasks);
     presentation.apply(resolve_client_npc_waypoint_update(
@@ -552,7 +558,7 @@ pub(super) fn sync_world_mission_indicators(
         return;
     };
     let player_position = player.translation();
-    let active_tasks = active_world_mission_waypoint_tasks(&mission, &content);
+    let active_tasks = active_world_mission_waypoint_tasks(&mission, &content,ffone_client::tutorial_mission_content::MissionMarkerSurface::Overhead);
     let selected_projection =
         project_selected_mission_waypoints(mission.selected_mission_id(), &active_tasks);
     let owned_nanos = nano_bank
@@ -580,8 +586,9 @@ pub(super) fn sync_world_mission_indicators(
         let in_refresh_near_list = player_position.distance(transform.translation())
             < WORLD_MISSION_INDICATOR_REFRESH_RANGE;
         let (has_new_mission_available, has_active_terminating_task) = mission
-            .npc_has_available_or_completable_mission(
+            .npc_mission_markers_on(
                 appearance.0.npc_type,
+                ffone_client::tutorial_mission_content::MissionMarkerSurface::Overhead,
                 i32::from(runtime.player_level),
                 guide,
                 &owned_nanos,

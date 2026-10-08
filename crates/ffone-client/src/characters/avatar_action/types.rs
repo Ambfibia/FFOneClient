@@ -12,6 +12,12 @@ pub enum LegacyAvatarTraversalPresentation {
     None,
     Slope,
     Zipline,
+    Launcher,
+    LauncherFall,
+    LauncherIdle,
+    /// Primary AvatarLauncher(false) requests absent `luncherfly`: Play keeps
+    /// the current main animation when Animation[name] is null.
+    LauncherUnposed,
     RopeDrop,
     RopeLeft,
     RopeRight,
@@ -67,6 +73,10 @@ impl LegacyAvatarPresentationContext {
         match self.traversal {
             LegacyAvatarTraversalPresentation::Slope => Some(LegacyLocomotionState::Slide),
             LegacyAvatarTraversalPresentation::Zipline => Some(LegacyLocomotionState::RopeDown),
+            LegacyAvatarTraversalPresentation::Launcher => Some(LegacyLocomotionState::Launcher),
+            LegacyAvatarTraversalPresentation::LauncherFall => Some(LegacyLocomotionState::LauncherFall),
+            LegacyAvatarTraversalPresentation::LauncherIdle => Some(LegacyLocomotionState::LauncherIdle),
+            LegacyAvatarTraversalPresentation::LauncherUnposed => None,
             LegacyAvatarTraversalPresentation::RopeDrop => Some(LegacyLocomotionState::RopeDrop),
             LegacyAvatarTraversalPresentation::RopeLeft => Some(LegacyLocomotionState::RopeLeft),
             LegacyAvatarTraversalPresentation::RopeRight => Some(LegacyLocomotionState::RopeRight),

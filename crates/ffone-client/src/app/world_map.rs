@@ -315,10 +315,11 @@ pub(super) struct WorldMapInputResources<'w> {
 }
 
 #[derive(SystemParam)]
-pub(super) struct WorldMapProjectionAuthority<'w> {
+pub(super) struct WorldMapProjectionAuthority<'w,'s> {
     pub(super) content: Res<'w, TutorialMissionContent>,
     pub(super) race_catalog: Res<'w, RaceRankCatalog>,
     pub(super) skill_buffs: Res<'w, SkillBuffUiModel>,
+    pub(super) squares: Query<'w,'s,(&'static ffone_client::world::NativeWorldSceneRoot,&'static ffone_client::world::NativeSquareSettings)>,
 }
 
 impl WorldMapOpenBlockers {
@@ -947,6 +948,9 @@ pub(super) fn sync_world_map_projection(
     )
     .map(str::to_owned)
     .unwrap_or_else(|| runtime.map_name.clone());
+    if let Some(name)=authority.squares.iter().find(|(root,_)|root.tile==ffone_client::world::square_at(Vec3::new(-player.position.x,0.,player.position.z))).map(|(_,s)|s.location.as_str()).filter(|s|!s.is_empty()) {
+        presentation.current_location=name.to_owned();runtime.map_name=name.to_owned();
+    }
 
     if presentation.model.phase() != WorldMapPhase::Open {
         presentation.markers.clear();

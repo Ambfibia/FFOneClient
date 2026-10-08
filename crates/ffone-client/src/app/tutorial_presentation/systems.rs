@@ -130,8 +130,12 @@ pub(super) fn sync_gameplay_hud(
         next.minimap.waypoint = if !option.runtime.options.display.waypoint {
             None
         } else if *state.get() == ClientState::Tutorial {
+            let visible=mission_runtime.active_tasks.iter().filter_map(|id|tutorial_content.mission(*id).ok())
+                .find(|definition|mission_runtime.selected_mission_id.is_none_or(|id|id==definition.provenance.mission_id))
+                .is_none_or(|definition|definition.provenance.marker_visibility.visible_on(ffone_client::tutorial_mission_content::MissionMarkerSurface::Minimap));
             mission_runtime
                 .waypoint_actor_id
+                .filter(|_|visible)
                 .and_then(|actor_id| actor_registry.entity(actor_id))
                 .and_then(|entity| actors.get(entity).ok())
                 .and_then(|(_, target_transform)| {
@@ -181,7 +185,7 @@ pub(super) fn sync_gameplay_hud(
                     // regular 18/19/20 marker in `RenderMinimap`.
                     let icon = tutorial_minimap_marker_icon(
                         actor.npc_type,
-                        tutorial_npc_mission_symbol(actor, &mission_runtime),
+                        tutorial_npc_mission_symbol(actor, &mission_runtime,tutorial_content,ffone_client::tutorial_mission_content::MissionMarkerSurface::Minimap),
                     )?;
                     let target = transform.translation();
                     minimap_marker(
@@ -224,8 +228,9 @@ pub(super) fn sync_gameplay_hud(
                     let definition =
                         tutorial_content.gameplay_npc_minimap(npc_type)?;
                     let (new_available, advance_available) =
-                        missions.world.npc_has_available_or_completable_mission(
+                        missions.world.npc_mission_markers_on(
                             npc_type,
+                            ffone_client::tutorial_mission_content::MissionMarkerSurface::Minimap,
                             i32::from(runtime.player_level),
                             guide,
                             &owned_nanos,

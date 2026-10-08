@@ -64,6 +64,8 @@ pub(super) fn emit_world_nano_animation_sounds(
         Option<&WorldNanoAnimationSoundCursor>,
     )>,
     runtime: Option<ResMut<GameplayAudioRuntime>>,
+    mut effects: Option<ResMut<crate::tutorial_effects_runtime::TutorialEffectRuntime>>,
+    poses: Query<&GlobalTransform>,
 ) {
     let (Some(root), Some(loadout), Some(presentation), Some(sound_events), Some(mut runtime)) = (
         state.entity,
@@ -121,6 +123,22 @@ pub(super) fn emit_world_nano_animation_sounds(
                     .allows_sound(&event.payload, &mut stand_random)
                 {
                     runtime.queue_legacy_nano_animation_sound(root, &event.payload);
+                }
+            }
+        }
+        if let (Some(effects), Ok(pose)) = (effects.as_deref_mut(), poses.get(root)) {
+            for event in assets.corruption_events.iter().filter(|event| event.clip == asset_clip) {
+                let crossings = animation_event_crossings(previous_seek, previous_completions,
+                    active.seek_time(), active.completions(), active.repeat_mode(), event.time);
+                for _ in 0..crossings {
+                    effects.enqueue(crate::tutorial_effects_runtime::TutorialEffectRuntimeCommand::Add {
+                        effect_id: event.effect_id,
+                        placement: crate::tutorial_effects_runtime::TutorialEffectPlacement::ExactEntityWorld {
+                            root_entity: root, position: pose.translation(), rotation: pose.rotation(),
+                        },
+                        scale: 1.0, tracked: false, name: None,
+                        destroy_after_seconds: None, source_line: 0,
+                    });
                 }
             }
         }

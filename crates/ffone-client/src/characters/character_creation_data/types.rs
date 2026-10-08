@@ -6,10 +6,10 @@ pub type CharacterCreationDataResult<T> = Result<T, CharacterCreationDataError>;
 /// `face_variant`/`hair_variant` select the serialized `_type01`/`_type02`
 /// models; `None` means the hair renderer is removed entirely.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct LegacyHatPolicy {
-    pub(super) face_variant: u8,
-    pub(super) hair_variant: Option<u8>,
-    pub(super) glasses_visible: bool,
+pub struct LegacyHatPolicy {
+    pub face_variant: u8,
+    pub hair_variant: Option<u8>,
+    pub glasses_visible: bool,
 }
 
 impl Default for LegacyHatPolicy {
@@ -23,7 +23,7 @@ impl Default for LegacyHatPolicy {
 }
 
 impl LegacyHatPolicy {
-    pub(super) fn from_equip_type(equip_type: u8) -> CharacterCreationDataResult<Self> {
+    pub fn from_equip_type(equip_type: u8) -> CharacterCreationDataResult<Self> {
         match equip_type {
             0 => Ok(Self::default()),
             1 => Ok(Self {

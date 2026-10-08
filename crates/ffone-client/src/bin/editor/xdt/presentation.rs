@@ -226,6 +226,7 @@ pub(super) fn draw(
         root.spawn(row()).with_children(|bar| {
             if !creating {
             action(bar, f, Action::Save, "save", "Save  Ctrl+S", 124.);
+            action(bar, f, Action::Rewrite, "mission.rewrite", "Rewrite", 120.);
             action(bar, f, Action::Undo, "undo", "Undo", 70.);
             action(bar, f, Action::Redo, "redo", "Redo", 70.);
             action(bar, f, Action::Add, if table.label.ends_with("/m_pMissionTable/m_pMissionData") { "new_mission" } else { "new_record" }, "+ New record", 150.);
@@ -242,6 +243,7 @@ pub(super) fn draw(
             action(bar, f, Action::Advanced, if e.advanced { "basic" } else { "advanced" },
                 if e.advanced { "Main fields" } else { "All fields" }, 160.);
         });
+        mission_server::destination(root, f, e, l, lang);
         root.spawn(Node { flex_grow: 1., min_height: px(0), column_gap: px(12), overflow: Overflow::clip(), ..default() })
         .with_children(|body| {
             if !creating && !graph {
@@ -326,7 +328,8 @@ pub(super) fn draw(
             });
         });
         label(root, f, format!("{} / {} · {}{}", e.filtered.len(), e.rows().len(),
-            tr(l, lang, if e.dirty() || creating { "unsaved" } else { "saved" }, if e.dirty() || creating { "Unsaved changes" } else { "Saved" }),
+            tr(l, lang, if e.dirty() || creating { "unsaved" } else if e.unpublished() { "mission.pending_work" } else { "saved" },
+                if e.dirty() || creating { "Unsaved changes" } else if e.unpublished() { "Saved · Not applied to game" } else { "Saved" }),
             if e.status.is_empty() || e.status == "Saved" { String::new() } else { format!(" · {}", schema::status(&e.status, l, lang)) }), 13., MUTED);
     });
 }
@@ -546,6 +549,7 @@ fn creation(
 ) {
     let Some(draft) = &e.draft else { return };
     label(p, f, tr(l, lang, if draft.placeholder { "new_placeholder" } else { "new_record" }, if draft.placeholder { "Create placeholder" } else { "New record" }), 19., WHITE);
+    npc_templates::choices(p, f, e, l, lang);
     p.spawn(row()).with_children(|bar| {
         action(bar, f, Action::Create, "create", "Create record", 170.);
         action(bar, f, Action::Cancel, "cancel", "Cancel  Esc", 120.);

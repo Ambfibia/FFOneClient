@@ -10,7 +10,7 @@ use ffone_client::{
     localization::{Language, Localization, LocalizedText},
     login_ui::{
         LoginSurface, LoginUiAssetStatus, LoginUiEffect, LoginUiEffectOutbox, LoginUiModel,
-        LoginUiOutbox,
+        LoginUiOutbox, LoginBrowser,
     },
     network::{NetworkBridge, NetworkCommand},
     system_message_ui::{SystemMessageButtonType, SystemMessageRequest, SystemMessageUiModel},
@@ -44,6 +44,7 @@ pub(super) struct LoadedCharacterCreationData(pub(super) Arc<CharacterCreationDa
 pub(super) struct Credentials {
     pub(super) username: String,
     pub(super) password: String,
+    pub(super) cookie: bool,
 }
 
 #[derive(Default, Resource)]
@@ -72,7 +73,7 @@ impl PendingLogin {
         };
         match env::var(&config.password_env) {
             Ok(password) if !password.is_empty() => Self {
-                credentials: Some(Credentials { username, password }),
+                credentials: Some(Credentials { username, password, cookie: false }),
                 note: "OpenFusion auto-login queued".to_owned(),
             },
             _ => Self {
@@ -163,8 +164,9 @@ pub(super) fn gate_login_loading(
 }
 
 pub(super) fn handle_login_ui_requests(
-    config: Res<ClientConfig>,
+    mut config: ResMut<ClientConfig>,
     bridge: Res<NetworkBridge>,
+    mut browser: ResMut<LoginBrowser>,
     mut active_credentials: ResMut<ActiveLoginCredentials>,
     mut outbox: ResMut<LoginUiOutbox>,
     mut runtime: ResMut<RuntimeStatus>,
@@ -172,24 +174,32 @@ pub(super) fn handle_login_ui_requests(
     mut next_state: ResMut<NextState<ClientState>>,
 ) {
     for request in outbox.drain() {
-        // Clean `CnLoginMode.Login` explicitly clears `bAutoLogin` and
-        // `bWebLogin` before sending a manually entered credential request.
         login_ui.surface = LoginSurface::Manual;
-        runtime.message = format!("Connecting to {}...", config.login_address);
-        next_state.set(ClientState::Login);
-        active_credentials.credentials = Some(Credentials {
-            username: request.username.clone(),
-            password: request.password.clone(),
-        });
-        if let Err(error) = bridge.send(NetworkCommand::Login {
-            login_address: config.login_address.clone(),
-            username: request.username,
-            password: request.password,
-        }) {
-            runtime.message.clone_from(&error);
-            login_ui.status = error;
+        runtime.message = format!("Connecting to {}...", browser.selected_address());
+        login_ui.status.clone_from(&runtime.message);
+        browser.start_login(request.username, request.password);
+    }
+    let Some(result) = browser.take_login() else { return; };
+    let (address, username, password) = match result {
+        Ok(wire) => wire,
+        Err(error) => {
+            runtime.message = format!("Login failed: {error}");
+            login_ui.status.clone_from(&runtime.message);
             login_ui.busy = false;
+            return;
         }
+    };
+    config.login_address = address;
+    next_state.set(ClientState::Login);
+    active_credentials.credentials = Some(Credentials { username: username.clone(), password: password.clone(), cookie: browser.servers[browser.selected].api.is_some() });
+    let command = if browser.servers[browser.selected].api.is_some() {
+        NetworkCommand::LoginCookie { login_address: config.login_address.clone(), username, cookie: password }
+    } else { NetworkCommand::Login { login_address: config.login_address.clone(), username, password } };
+    if let Err(error) = bridge.send(command) {
+        runtime.message = format!("Login failed: {error}");
+        login_ui.status.clone_from(&runtime.message);
+        login_ui.busy = false;
+        browser.finish_login(false);
     }
 }
 
@@ -239,12 +249,14 @@ pub(super) fn consume_login_ui_effects(
 }
 
 pub(super) fn sync_login_ui(
+    mut browser: ResMut<LoginBrowser>,
     runtime: Res<RuntimeStatus>,
     state: Res<State<ClientState>>,
     system_messages: Res<SystemMessageUiModel>,
     mut model: ResMut<LoginUiModel>,
 ) {
     let visible = *state.get() == ClientState::Login;
+    if *state.get() == ClientState::CharacterSelect { browser.finish_login(true); }
     if model.visible != visible {
         model.visible = visible;
         if !visible {
@@ -264,6 +276,7 @@ pub(super) fn sync_login_ui(
             || runtime.message.starts_with("Offline")
         {
             model.busy = false;
+            browser.finish_login(false);
         }
     }
     model.system_popup_active = system_messages.current().is_some();

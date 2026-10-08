@@ -45,7 +45,8 @@ pub(super) fn resolve_required_tutorial_player_clips(
             | TutorialPlayerClip::JumpEnd
             | TutorialPlayerClip::JumpLandRun
             | TutorialPlayerClip::Slide
-            | TutorialPlayerClip::RopeDown
+            | TutorialPlayerClip::Launcher
+                | TutorialPlayerClip::RopeDown
             | TutorialPlayerClip::RopeDrop
             | TutorialPlayerClip::RopeLeft
             | TutorialPlayerClip::RopeRight

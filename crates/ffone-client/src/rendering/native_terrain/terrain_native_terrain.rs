@@ -88,7 +88,7 @@ impl NativeTerrain {
     /// their pre-migration environment digest as provenance, so the world
     /// loader supplies the already-validated registry digest here instead of
     /// silently weakening byte verification.
-    pub(crate) fn open_with_authoritative_environment(
+    pub fn open_with_authoritative_environment(
         asset_root: impl AsRef<Path>,
         descriptor_path: &str,
         expected_descriptor_blake3: &str,

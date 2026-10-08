@@ -275,7 +275,7 @@ pub(super) fn sync_tutorial_world_mission_indicators(
         .iter()
         .filter(|(_, actor, _, _)| actor.is_alive())
         .filter_map(|(entity, actor, _visual, transform)| {
-            tutorial_npc_mission_symbol(actor, &mission).map(|symbol| {
+            tutorial_npc_mission_symbol(actor, &mission,&content,ffone_client::tutorial_mission_content::MissionMarkerSurface::Overhead).map(|symbol| {
                 (
                     actor.id,
                     (symbol, actor.npc_type, transform.rotation, entity, true),

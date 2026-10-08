@@ -17,6 +17,7 @@ use crate::{
     mission_ui::{MissionUiEntry, PendingMissionUiRequest},
     tutorial_mission_content::{
         TutorialMissionContent, TutorialMissionDefinition, TutorialMissionType,
+        MissionMarkerSurface,
     },
 };
 

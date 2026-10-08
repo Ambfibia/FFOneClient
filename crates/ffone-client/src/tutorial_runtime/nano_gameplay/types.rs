@@ -165,6 +165,7 @@ pub(super) struct TutorialNanoGameplayAssets {
     pub(super) graph: Option<Handle<AnimationGraph>>,
     pub(super) nodes: BTreeMap<&'static str, AnimationNodeIndex>,
     pub(super) sound_events: Option<Arc<[NetworkNpcAnimationSoundEvent0104]>>,
+    pub(super) corruption_events: Vec<corruption::ParticleEvent>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]

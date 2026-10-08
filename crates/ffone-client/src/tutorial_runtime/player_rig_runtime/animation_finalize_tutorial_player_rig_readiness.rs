@@ -365,6 +365,7 @@ pub(super) fn legacy_visual_tutorial_clip(
         LegacyVisualClip::SwimRight => TutorialPlayerClip::SwimRight,
         LegacyVisualClip::Slide => TutorialPlayerClip::Slide,
         LegacyVisualClip::RopeDown => TutorialPlayerClip::RopeDown,
+        LegacyVisualClip::Launcher => TutorialPlayerClip::Launcher,
         LegacyVisualClip::RopeDrop => TutorialPlayerClip::RopeDrop,
         LegacyVisualClip::RopeLeft => TutorialPlayerClip::RopeLeft,
         LegacyVisualClip::RopeRight => TutorialPlayerClip::RopeRight,

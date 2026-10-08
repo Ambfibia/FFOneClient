@@ -54,7 +54,9 @@ fn open(
         language.requested = "ru".into();
         language.effective = "ru".into();
     }
-    if probe.clicked || capture.ready.is_none() || *client.get() != ClientState::World {
+    let gamepad = env::var("FFONE_PERF_GAMEPAD_SCENARIO").as_deref() == Ok("vendor");
+    if probe.clicked || gamepad && probe.opened
+        || !gamepad && capture.ready.is_none() || *client.get() != ClientState::World {
         return;
     }
     if probe.opened && production.modal_active() && state_is_open(&ui) {
@@ -109,7 +111,11 @@ fn open(
         sort_num: 0,
     }; VENDOR_TABLE_ITEM_COUNT_0104];
     // First two published listings of vendor 650, with their actual item types.
-    for (index, (kind, id)) in [(0, 433), (4, 63)].into_iter().enumerate() {
+    let mut listings = vec![(0, 433), (4, 63)];
+    if env::var("FFONE_PERF_GAMEPAD_SCENARIO").as_deref() == Ok("vendor") {
+        listings.push((7, 1));
+    }
+    for (index, (kind, id)) in listings.into_iter().enumerate() {
         items[index].item = ItemBase0104 {
             item_type: kind,
             item_id: id,

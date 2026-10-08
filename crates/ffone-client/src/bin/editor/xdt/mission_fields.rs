@@ -5,6 +5,8 @@ pub(super) fn choices(field: &str) -> &'static [(i64, &'static str)] {
     match field {
         "m_iHDifficultyType" => &[(0, "Easy"), (1, "Normal"), (2, "Hard")],
         "m_iHMissionType" => &[(1, "GuideMission"), (2, "NanoMission"), (3, "WorldMission")],
+        "m_iHMissionVisibility" => &[(0,"MissionOrdinary"),(1,"MissionSemiSecret"),(2,"MissionExploration"),(3,"MissionSecret")],
+        "m_iSTMessageType" | "m_iSUMessageType" | "m_iFMessageType" => &[(0,"MessageNone"),(1,"MessageFlag1"),(2,"MessageNanoCom"),(3,"MessageNanoComFlag1"),(4,"MessageEmail"),(5,"MessageEmailFlag1"),(6,"MessageBoth"),(7,"MessageBothFlag1")],
         "m_iHTaskType" => &[
             (1, "Talk"),
             (2, "GotoLocation"),
@@ -38,6 +40,8 @@ pub(super) fn help(field: &str) -> Option<&'static str> {
         "m_iHMissionType" => {
             "Mission category: 1 Guide, 2 Nano, 3 World. Nano rewards and level progression must be configured separately."
         }
+        "m_iHMissionVisibility" => "Mission marker visibility: ordinary on every surface; semi-secret on the minimap only; exploration above the NPC only; secret nowhere. Applies to every stage of this mission.",
+        "m_iSTMessageType" | "m_iSUMessageType" | "m_iFMessageType" => "Message channel flags: 2 Nano-Com, 4 E-mail, 6 both. The original message handler ignores flag 1: 1 sends neither channel, 3 sends Nano-Com. Other flags are preserved.",
         "m_iHTaskType" => {
             "Stage kind: 1 Talk, 2 Go to a location, 3 Use items, 4 Delivery, 5 Defeat enemies, 6 Escort or defend. Configure the actual objectives below."
         }
@@ -121,6 +125,9 @@ pub(super) fn help(field: &str) -> Option<&'static str> {
 }
 
 pub(super) fn invalid(field: &str, value: &Value) -> Option<&'static str> {
+    if matches!(field,"m_iSTMessageType"|"m_iSUMessageType"|"m_iFMessageType") {
+        return value.as_i64().is_none_or(|n|n<0||n>i32::MAX as i64).then_some("mission_range");
+    }
     let options = choices(field);
     if !options.is_empty() {
         return (!options.iter().any(|(n, _)| value.as_i64() == Some(*n)))

@@ -296,8 +296,10 @@ impl NativeEffectRoot {
     }
 }
 
-#[derive(Component)]
-pub(super) struct NativeEffectBillboard;
+#[derive(Component, Default)]
+pub(super) struct NativeEffectBillboard {
+    pub(super) upright: bool,
+}
 
 #[derive(Component)]
 pub(super) struct NativeEmitter {

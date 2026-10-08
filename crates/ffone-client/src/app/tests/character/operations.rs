@@ -23,6 +23,7 @@ fn production_login_surface_uses_only_owned_manual_and_auto_contexts() {
 
     let automatic = PendingLogin {
         credentials: Some(Credentials {
+            cookie: false,
             username: "Dexter".to_owned(),
             password: "nano".to_owned(),
         }),

@@ -250,7 +250,7 @@ pub(super) fn field(
     parent
         .spawn((
             Button,
-            Action::Field(focus),
+            Action::Field(focus.clone()),
             sliced_image(fonts.textfield.clone(),OPTION_TEXT_FIELD_BORDER),
             Node {
                 flex_grow: 1.,
@@ -265,7 +265,9 @@ pub(super) fn field(
                 ..default()
             },
             ScrollRegion(3),
-            ScrollPosition::default(),
+            input::FieldScrollKey(input::field_scroll_key(editor, &focus)),
+            ScrollPosition(editor.workspace.field_scrolls.get(&input::field_scroll_key(editor, &focus))
+                .copied().unwrap_or_default()),
             BorderColor::all(if active {
                 mission_skin::CYAN
             } else {
@@ -293,6 +295,7 @@ pub(super) fn field(
             let mut entity = p.spawn((
                 bundle,
                 EditText,
+                ffone_client::localization::UiTextNoAutoFit,
                 RelativeCursorPosition::default(),
                 Node {
                     width: if height > 40. { percent(100) } else { Val::Auto },

@@ -419,6 +419,7 @@ pub(super) fn spawn_guide_confirmation_window(parent: &mut ChildSpawnerCommands,
     parent
         .spawn((
             GuideUiConfirmationWindow,
+            crate::ui::shared::controller::ControllerUiBoundary,
             absolute_node(GUIDE_WINDOW_RECT),
             UiTransform::default(),
             Pickable::IGNORE,
@@ -524,7 +525,7 @@ pub(super) fn spawn_guide_button(
     } else {
         GUIDE_JEFFE_14_LINE_HEIGHT
     };
-    parent
+    let mut button = parent
         .spawn((
             Button,
             GuideUiCommandButton { command, visual },
@@ -536,8 +537,8 @@ pub(super) fn spawn_guide_button(
             },
             image,
             Pickable::default(),
-        ))
-        .with_children(|button| {
+        ));
+    button.with_children(|button| {
             if !label.is_empty() {
                 let role = match command {
                     GuideUiCommand::AcceptWarpWarning => GuideUiTextRole::WarpButton,
@@ -580,6 +581,16 @@ pub(super) fn spawn_guide_button(
                 ));
             }
         });
+    match command {
+        GuideUiCommand::SelectMentor(_) | GuideUiCommand::ConfirmMentor
+        | GuideUiCommand::AcceptWarpWarning => {
+            button.insert(crate::ui::shared::controller::ControllerUiDefault);
+        }
+        GuideUiCommand::Dismiss(GuideUiDismissalSource::CloseButton) => {
+            button.insert(crate::ui::shared::controller::ControllerUiClose);
+        }
+        _ => {}
+    }
 }
 
 pub(super) fn spawn_image(parent: &mut ChildSpawnerCommands, rect: GuideUiRect, image: ImageNode) -> Entity {

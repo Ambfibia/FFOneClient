@@ -48,6 +48,9 @@ pub enum LegacyLocomotionState {
     SwimRight,
     Slide,
     RopeDown,
+    Launcher,
+    LauncherFall,
+    LauncherIdle,
     RopeDrop,
     RopeLeft,
     RopeRight,
@@ -83,6 +86,9 @@ impl LegacyLocomotionState {
             Self::SwimRight => LegacyVisualClip::SwimRight,
             Self::Slide => LegacyVisualClip::Slide,
             Self::RopeDown => LegacyVisualClip::RopeDown,
+            Self::Launcher => LegacyVisualClip::Launcher,
+            Self::LauncherFall => LegacyVisualClip::Jump,
+            Self::LauncherIdle => LegacyVisualClip::Stand1,
             Self::RopeDrop => LegacyVisualClip::RopeDrop,
             Self::RopeLeft => LegacyVisualClip::RopeLeft,
             Self::RopeRight => LegacyVisualClip::RopeRight,
@@ -111,6 +117,7 @@ pub struct LegacyAvatarActionState {
     pub(super) visual_initialized: bool,
     /// A confirmed Hand change owns Ready until its first rendered cycle ends.
     pub(super) weapon_change_visual_active: bool,
+    pub(super) launcher_pose_finished: bool,
     pub(super) was_grounded: bool,
     pub(super) was_in_combat: bool,
     pub(super) attack_sequence: u32,
@@ -130,6 +137,7 @@ impl Default for LegacyAvatarActionState {
             death_phase: LegacyAvatarDeathPhase::Alive,
             visual_initialized: false,
             weapon_change_visual_active: false,
+            launcher_pose_finished: false,
             was_grounded: true,
             was_in_combat: false,
             attack_sequence: 1,
@@ -142,6 +150,14 @@ impl Default for LegacyAvatarActionState {
 }
 
 impl LegacyAvatarActionState {
+    pub fn begin_launcher_pose(&mut self) {
+        self.launcher_pose_finished = false;
+        self.visual_initialized = false;
+    }
+
+    pub fn launcher_pose_finished(&self) -> bool {
+        self.launcher_pose_finished
+    }
     pub fn interrupt_for_damage(&mut self) {
         self.weapon_change_visual_active = false;
         self.upper_action = None;

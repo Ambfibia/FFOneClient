@@ -68,6 +68,8 @@ fn every_editor_source_key_exists_in_the_production_bundles() {
         fs::read_to_string(repo_root().join("crates/ffone-client/src/bin/editor/strings_tools.rs"))
             .unwrap();
     let all_sources = format!("{source}\n{equipment}\n{strings}\n{exchange}\n{editing_tools}");
+    let text_helper = fs::read_to_string(repo_root().join(
+        "crates/ffone-client/src/bin/ffone-editor/operations_handle_editor_buttons.rs")).unwrap();
     let authored = all_sources
         .split('"')
         .filter(|token| token.starts_with("ui.editor."))
@@ -85,7 +87,7 @@ fn every_editor_source_key_exists_in_the_production_bundles() {
         assert!(ru.contains(key), "missing RU editor key {key}");
     }
     assert_eq!(
-        source.matches("text: Text::new(").count(),
+        text_helper.matches("text: Text::new(").count(),
         1,
         "all editor Text must be created through the key-first editor_text helper"
     );
@@ -104,5 +106,29 @@ fn production_text_bundles_have_identical_keys_and_placeholders() {
             placeholders(ru[key].as_str().unwrap()),
             "{key}"
         );
+    }
+}
+
+#[test]
+fn mission_boundary_commands_and_npc_creation_are_localized() {
+    let en = bundle("en");
+    let ru = bundle("ru");
+    for key in [
+        "ui.editor.xdt.mission.make_first",
+        "ui.editor.xdt.mission.make_last",
+        "ui.editor.xdt.mission.end",
+        "ui.editor.xdt.mission.error_boundary_chain",
+        "ui.editor.xdt.mission.error_boundary_branch",
+        "ui.editor.xdt.mission.rewrite",
+        "ui.editor.xdt.mission.pending_work",
+        "ui.editor.xdt.mission.saved_work",
+        "ui.editor.xdt.mission.restored_work",
+        "ui.editor.npc.new_template",
+    ] {
+        let english = en["entries"][key].as_str().expect(key);
+        let russian = ru["entries"][key].as_str().expect(key);
+        assert!(!english.trim().is_empty(), "empty EN {key}");
+        assert!(!russian.trim().is_empty(), "empty RU {key}");
+        assert_ne!(english, russian, "untranslated RU {key}");
     }
 }

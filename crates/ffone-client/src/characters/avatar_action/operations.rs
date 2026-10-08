@@ -284,6 +284,9 @@ pub(super) fn cross_fade(
 #[must_use]
 pub(super) const fn legacy_presentation_transition_seconds(state: LegacyLocomotionState) -> f32 {
     match state {
+        // Animation.Update replaces luncher with jump once JumpVelocity <= 0.
+        LegacyLocomotionState::LauncherFall => 0.15,
+        LegacyLocomotionState::LauncherIdle => LEGACY_END_ANIMATION_BLEND_SECONDS,
         // `AvatarSlope(1)` uses CrossFade("slide", .35f).
         LegacyLocomotionState::Slide => 0.35,
         // `SetInvenMotion` uses CrossFade(StrModifyForVehicle("inven"), .1f).
@@ -291,7 +294,8 @@ pub(super) const fn legacy_presentation_transition_seconds(state: LegacyLocomoti
         | LegacyLocomotionState::BoardInventory
         | LegacyLocomotionState::ScooterInventory => 0.1,
         // `AvatarZipline` and `AvatarRope` call Play, not CrossFade.
-        LegacyLocomotionState::RopeDown
+        LegacyLocomotionState::Launcher
+        | LegacyLocomotionState::RopeDown
         | LegacyLocomotionState::RopeDrop
         | LegacyLocomotionState::RopeLeft
         | LegacyLocomotionState::RopeRight
@@ -454,6 +458,19 @@ pub(super) fn process_legacy_visual_completions(
             .authoritative_locomotion_override();
         if completion.clip == LegacyVisualClip::Ready && state.weapon_change_visual_active {
             state.weapon_change_visual_active = false;
+        }
+        if completion.clip == LegacyVisualClip::Launcher && controller.launcher_active()
+            && state.locomotion == LegacyLocomotionState::Launcher {
+            // A finished non-looping main clip takes SetNextMotion's default
+            // GetStandName branch. It must not restart on the next flight tick.
+            state.launcher_pose_finished = true;
+            state.locomotion = LegacyLocomotionState::LauncherIdle;
+            visuals.pending.push_back(LegacyVisualRequest {
+                actor: completion.actor,
+                command: cross_fade_with_duration(bindings, LegacyVisualClip::Stand1,
+                    LegacyAnimationLayer::FullBody, false, LEGACY_END_ANIMATION_BLEND_SECONDS),
+            });
+            continue;
         }
         if context.dead
             && state.death_phase == LegacyAvatarDeathPhase::Dying

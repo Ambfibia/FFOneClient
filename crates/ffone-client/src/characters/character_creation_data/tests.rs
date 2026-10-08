@@ -42,7 +42,7 @@ fn production_documents_are_manifest_verified_and_exactly_sized() {
     assert_eq!(data.names_document().middle_names.len(), 601);
     assert_eq!(data.names_document().last_names.len(), 602);
     assert_eq!(data.appearance_document().creation_rows.len(), 32);
-    assert_eq!(data.avatar_items_document().items.len(), 3_414);
+    assert_eq!(data.avatar_items_document().items.len(), 3_981);
 }
 
 #[test]
@@ -469,6 +469,32 @@ fn recovered_primary_girl_skirts_resolve_from_the_current_item_catalog() {
 }
 
 #[test]
+fn academy_rath_mask_binds_its_own_texture_for_both_genders() {
+    let data = production_data();
+    let mask = &data.items[&(AvatarItemCategory::Hat, 449)];
+    assert_eq!(mask.name, "Rath Mask");
+    assert_eq!(mask.equip_type, 3);
+    assert_eq!(mask.icon.as_ref().unwrap().status, NativeLookupStatus::VerifiedUnique);
+    assert!(mask.icon.as_ref().unwrap().candidates[0].path.ends_with("/cosicon_2020.png"));
+    for gender in [UiGender::Boy, UiGender::Girl] {
+        let creator = data.resolve_creator(0, 0, "Rath", "Mask", &CharacterAppearance {
+            gender, ..CharacterAppearance::default()
+        }).unwrap();
+        let look = data.resolve_protocol_player_look(
+            "rath-mask".into(), creator.style.gender, creator.style.face_style,
+            creator.style.hair_style, creator.style.hair_color, creator.style.skin_color,
+            creator.style.eye_color, creator.style.height, creator.style.body,
+            |slot| if slot == CharacterEquipSlot0104::Head {449} else {0},
+        ).unwrap();
+        let hat = look.parts.iter().find(|part| part.kind == NativePlayerPartKind::Hat).unwrap();
+        assert_eq!(hat.exact_route, "wear/helmet_bigchillmask.nif");
+        assert!(hat.primary_texture.as_ref().unwrap().path.ends_with("/helmet_rathmask.png"));
+        assert!(look.parts.iter().all(|part| !matches!(part.kind, NativePlayerPartKind::Hair | NativePlayerPartKind::Glasses)));
+        assert!(look.parts.iter().any(|part| part.kind == NativePlayerPartKind::Face && part.glb.contains("_type02/")));
+    }
+}
+
+#[test]
 fn every_verified_avatar_texture_route_is_audited_and_exact_publications_bind() {
     let data = production_data();
     let mut verified_routes = std::collections::BTreeSet::new();
@@ -519,11 +545,11 @@ fn every_verified_avatar_texture_route_is_audited_and_exact_publications_bind() 
         verified_routes.len() - published_routes.len(),
         coverage.avatar_deferred_verified_routes as usize
     );
-    assert_eq!(coverage.avatar_verified_unique_routes, 2_417);
-    assert_eq!(coverage.avatar_published_routes, 2_417);
+    assert_eq!(coverage.avatar_verified_unique_routes, 2_772);
+    assert_eq!(coverage.avatar_published_routes, 2_772);
     assert_eq!(coverage.avatar_deferred_verified_routes, 0);
     assert!(coverage.avatar_missing_source_metadata.is_empty());
-    assert_eq!(data.runtime_textures_document().textures.len(), 2_571);
+    assert_eq!(data.runtime_textures_document().textures.len(), 2_932);
 }
 
 #[test]

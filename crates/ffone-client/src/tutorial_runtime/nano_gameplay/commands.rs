@@ -30,6 +30,11 @@ pub enum TutorialNanoGameplayCommand {
     PlayWorldSkill {
         owner: Entity,
     },
+    PlayCorruption {
+        owner: Entity,
+        nano_id: i16,
+        hit_flag: i8,
+    },
 }
 
 #[derive(Debug, Default, Resource)]
@@ -88,6 +93,12 @@ impl TutorialNanoGameplayCommandQueue {
     pub fn play_world_skill(&mut self, owner: Entity) {
         self.pending
             .push_back(TutorialNanoGameplayCommand::PlayWorldSkill { owner });
+    }
+
+    pub fn play_corruption(&mut self, owner: Entity, nano_id: i16, hit_flag: i8) {
+        self.pending.push_back(TutorialNanoGameplayCommand::PlayCorruption {
+            owner, nano_id, hit_flag,
+        });
     }
 
     #[must_use]

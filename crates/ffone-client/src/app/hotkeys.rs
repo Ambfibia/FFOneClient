@@ -470,6 +470,15 @@ pub(super) fn route_world_ui_shortcuts(
         }
         return;
     }
+    if mission.npc_icon_mode_visible {
+        if (pressed(LegacyOptionAction::Escape) || keyboard.just_pressed(KeyCode::Escape))
+            && mission.close_npc_interaction(&mut outbox)
+        {
+            audio.push(GameplayUiAudioCue::CloseScreen);
+            keyboard.clear_just_pressed(KeyCode::Escape);
+        }
+        return;
+    }
     if !mission.enabled
         || mission.gameplay_input_blocked()
         || transition.open

@@ -46,7 +46,8 @@ pub(super) fn buttons(
     language: Res<Language>,
 ) {
     exchange::poll(&mut editor);
-    if !state.xdt_open {
+    if state.npc_editing() && appearance.active(){return;}
+    if !state.xdt_open && !state.npc_editing() {
         return;
     }
     // Rebuilding a pressed button must not fire the same action again while held.
@@ -56,6 +57,7 @@ pub(super) fn buttons(
             continue;
         }
         let action = action.clone();
+        if state.npc_editing(){state.search_focused=false;}
         if let Action::Field(focus) = &action {
             if editor.focus.as_ref() == Some(focus) {
                 if let Some((text, node, cursor, block)) =
@@ -101,6 +103,7 @@ pub(super) fn buttons(
                     | Action::Required(_)
                     | Action::PickReference(..)
                     | Action::Choice(..)
+                    | Action::MobLevels | Action::MobLevel(_) | Action::MobStats(_)
                     | Action::Create
                     | Action::Apply
                     | Action::Advanced
@@ -112,6 +115,8 @@ pub(super) fn buttons(
                     | Action::Appearance
                     | Action::Mission(mission_workspace::Command::QuickCreate(_))
                     | Action::Mission(mission_workspace::Command::QuickPlaceholder(_))
+                    | Action::Mission(mission_workspace::Command::EventLocale(..))
+                    | Action::Mission(mission_workspace::Command::NpcTemplate(_))
                     | Action::EditSharedText(_)
                     | Action::CopyText(_)
             )
@@ -173,10 +178,14 @@ pub(super) fn buttons(
                 Action::ArrayCell(field, slot) => editor.begin_element(field, slot)?,
                 Action::ClearReference(field) => editor.clear_reference(&field)?,
                 Action::Field(focus) => editor.begin(focus),
+                Action::MobLevels => {editor.workspace.mob_level_picker=!editor.workspace.mob_level_picker;editor.workspace.mob_level=None;editor.revision+=1;},
+                Action::MobLevel(level) => {editor.workspace.mob_level=Some(level);editor.revision+=1;},
+                Action::MobStats(row) => editor.copy_mob_stats(row)?,
                 Action::Sort(field) => {
                     editor.toggle_sort(field);
                 }
                 Action::Save => editor.save()?,
+                Action::Rewrite => editor.rewrite()?,
                 Action::Undo => editor.undo(false),
                 Action::Redo => editor.undo(true),
                 Action::Add | Action::Duplicate => {
@@ -300,6 +309,7 @@ pub(super) fn buttons(
                     editor.picker_field = None;
                 }
                 Action::Choice(field, value) => {
+                    if field==mission_visibility::FIELD {return editor.set_mission_visibility(value);}
                     let slot=editor.array_slot;
                     let focus = if editor.draft.is_some() {
                         Focus::Draft(field.clone())
@@ -322,18 +332,10 @@ pub(super) fn buttons(
                 }
                 Action::Link(t, r) => editor.navigate(t, r),
                 Action::Reload => {
-                    if editor.dirty() && !editor.reload_confirm {
+                    if (editor.dirty() || editor.unpublished()) && !editor.reload_confirm {
                         editor.reload_confirm = true;
                     } else {
-                        let document = read(&editor.path)?;
-                        editor.base = document.clone();
-                        editor.document = document;
-                        editor.undo.clear();
-                        editor.redo.clear();
-                        editor.row = None;
-                        editor.discover();
-                        editor.reload_confirm = false;
-                        editor.status.clear();
+                        editor.reload_game()?;
                     }
                 }
                 Action::Export => exchange::start(&mut editor, false)?,
@@ -349,6 +351,7 @@ pub(super) fn buttons(
 }
 pub(super) fn keyboard(
     state: Res<EditorState>,
+    appearance:Res<hnpc::HnpcEditor>,
     keys: Res<ButtonInput<KeyCode>>,
     mut events: MessageReader<KeyboardInput>,
     mut editor: ResMut<XdtEditor>,
@@ -356,7 +359,7 @@ pub(super) fn keyboard(
     localization: Res<Localization>,
     language: Res<Language>,
 ) {
-    if !state.xdt_open {
+    if (!state.xdt_open && !state.npc_editing()) || (state.npc_editing() && (appearance.active() || state.search_focused)) {
         events.clear();
         return;
     }
@@ -611,17 +614,38 @@ pub(super) fn keyboard(
     }
 }
 
+pub(super) fn field_scroll_key(editor: &XdtEditor, focus: &Focus) -> String {
+    format!("{}:{:?}:{}:{focus:?}", editor.table, editor.row, editor.workspace.creation.len())
+}
+#[derive(Component)]
+pub(super) struct FieldScrollKey(pub String);
+
+pub(super) fn remember_field_scroll(
+    mut editor: ResMut<XdtEditor>,
+    fields: Query<(&FieldScrollKey, &ScrollPosition)>,
+) {
+    for (key, scroll) in &fields {
+        editor.workspace.field_scrolls.insert(key.0.clone(), scroll.0);
+    }
+}
+
 pub(super) fn reveal_caret(
     editor: Res<XdtEditor>,
-    texts: Query<(&ChildOf, &bevy::text::TextLayoutInfo, &ComputedTextBlock), With<ActiveText>>,
+    texts: Query<(&Text, &ChildOf, &bevy::text::TextLayoutInfo, &ComputedTextBlock), With<ActiveText>>,
     mut containers: Query<(&ComputedNode, &mut ScrollPosition)>,
     mut revision: Local<u64>,
 ) {
     if *revision == editor.revision {
         return;
     }
-    for (parent, layout, block) in &texts {
+    let mut ready = false;
+    for (text, parent, layout, block) in &texts {
         if block.buffer().is_empty() {
+            continue;
+        }
+        // A rebuilt UI can have an empty or stale layout for a frame. Retry
+        // until Parley has shaped this exact text before consuming the revision.
+        if block.buffer().lines().last().map(|line| line.text_range().end) != Some(text.0.len()) {
             continue;
         }
         let Ok((node, mut scroll)) = containers.get_mut(parent.parent()) else {
@@ -647,8 +671,9 @@ pub(super) fn reveal_caret(
         } else {
             scroll.0.y.max((bottom - size.y).max(0.))
         };
+        ready = true;
     }
-    *revision = editor.revision;
+    if ready { *revision = editor.revision; }
 }
 pub(super) fn scroll(
     state: Res<EditorState>,
@@ -663,7 +688,7 @@ pub(super) fn scroll(
     )>,
     window: Single<&Window>,
 ) {
-    if !state.xdt_open {
+    if !state.xdt_open && !state.npc_editing() {
         wheels.clear();
         return;
     }
@@ -767,7 +792,7 @@ pub(super) fn drag(
     let cursor = window.cursor_position();
     let moved = *previous != cursor;
     *previous = cursor;
-    if !state.xdt_open || !mouse.pressed(MouseButton::Left) {
+    if (!state.xdt_open && !state.npc_editing()) || !mouse.pressed(MouseButton::Left) {
         return;
     }
     for (track, relative) in &tracks {

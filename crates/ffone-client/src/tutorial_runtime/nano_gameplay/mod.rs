@@ -58,6 +58,7 @@ mod state;
 mod systems;
 mod textures;
 mod operations;
+mod corruption;
 mod assets_prepare_tutorial_nano_gameplay_a;
 
 pub use constants::{

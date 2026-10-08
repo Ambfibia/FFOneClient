@@ -7,6 +7,7 @@ fn traversal_and_inventory_semantics_map_exactly_without_weapon_prefixes() {
         (LegacyVisualClip::Death, TutorialPlayerClip::Death),
         (LegacyVisualClip::Slide, TutorialPlayerClip::Slide),
         (LegacyVisualClip::RopeDown, TutorialPlayerClip::RopeDown),
+        (LegacyVisualClip::Launcher, TutorialPlayerClip::Launcher),
         (LegacyVisualClip::RopeDrop, TutorialPlayerClip::RopeDrop),
         (LegacyVisualClip::RopeLeft, TutorialPlayerClip::RopeLeft),
         (LegacyVisualClip::RopeRight, TutorialPlayerClip::RopeRight),

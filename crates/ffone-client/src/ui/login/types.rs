@@ -206,6 +206,9 @@ impl Plugin for NativeLoginUiPlugin {
             app.add_plugins(TextEditPlugin);
         }
         app.init_resource::<LoginUiModel>()
+            .init_resource::<LoginBrowser>()
+            .init_resource::<browser_view::BrowserPopover>()
+            .init_resource::<account_view::AccountForm>()
             .init_resource::<LoginUiOutbox>()
             .init_resource::<LoginUiEffectOutbox>()
             .init_resource::<LoginLoadedBackgroundState>()
@@ -223,6 +226,10 @@ impl Plugin for NativeLoginUiPlugin {
             .add_systems(
                 Update,
                 (
+                    browser_view::keyboard,
+                    browser_view::interactions,
+                    browser_view::server_input_pointer,
+                    account_view::interactions,
                     handle_login_keyboard,
                     handle_login_interactions,
                     handle_login_language_interaction,
@@ -238,7 +245,7 @@ impl Plugin for NativeLoginUiPlugin {
             )
             .add_systems(
                 Update,
-                (update_login_layout, bind_login_ui, bind_login_language, control_login_music)
+                (update_login_layout, bind_login_ui, bind_login_language, control_login_music, browser_view::bind_browser, account_view::bind, browser_view::button_states, account_view::button_states, account_scroll::scroll, browser_view::bind_server_input)
                     .chain()
                     .in_set(LoginUiSet::Bind)
                     .before(LocalizationSet::Apply),
@@ -248,6 +255,10 @@ impl Plugin for NativeLoginUiPlugin {
 
 #[derive(Clone, Resource)]
 pub(super) struct LoginUiAssets {
+    pub(super) check_empty: Handle<Image>,
+    pub(super) check_checked: Handle<Image>,
+    pub(super) scroll_track: Handle<Image>,
+    pub(super) scroll_thumb: Handle<Image>,
     pub(super) background: Handle<Image>,
     pub(super) fallback_background: Handle<Image>,
     pub(super) panel: Handle<Image>,

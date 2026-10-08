@@ -45,6 +45,7 @@ pub(super) fn admit_bounded_ui_text(
             With<Text>,
             Without<UiTextAutoFit>,
             Without<crate::text_edit::EditVisual>,
+            Without<UiTextNoAutoFit>,
         ),
     >,
     parents: Query<(&Node, &Children)>,

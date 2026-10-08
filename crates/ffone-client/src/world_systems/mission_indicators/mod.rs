@@ -10,16 +10,17 @@
 //! evidence only. Runtime code opens the validated native JSON catalog under
 //! `assets/game` and has no legacy-build dependency.
 
-use std::{collections::BTreeSet, fmt::Write as _};
+use std::collections::BTreeSet;
 
 use bevy::prelude::{Resource, Vec3};
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 
 use crate::{assets::AssetLocator, coordinates::unity_to_native_vector};
 
 pub const CLIENT_NPC_WAYPOINT_CATALOG_PATH: &str = "data/missions/client-npc-waypoints.json";
-pub const CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA: &str = "ffone.client-npc-waypoint-catalog.v1";
+pub const CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA: &str = "ffone.client-npc-waypoint-catalog.v2";
+pub const LEGACY_CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA: &str = "ffone.client-npc-waypoint-catalog.v1";
+/// Accepted baseline prefix; appended authored destinations follow server placements.
 pub const CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT: usize = 2_903;
 pub const CLIENT_NPC_WAYPOINT_CATALOG_BYTES: u64 = 298_059;
 pub const CLIENT_NPC_WAYPOINT_CATALOG_SHA256: &str =
@@ -89,7 +90,7 @@ pub const fn world_npc_game_icon_effect(
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientNpcWaypointObjectProvenance {
     pub name: String,
@@ -99,7 +100,7 @@ pub struct ClientNpcWaypointObjectProvenance {
     pub script_path_id: i64,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientNpcWaypointProvenance {
     pub alias: String,
@@ -136,41 +137,48 @@ impl ClientNpcWaypointRow {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(tag = "schema")]
+enum ClientNpcWaypointDocument {
+    #[serde(rename = "ffone.client-npc-waypoint-catalog.v1")]
+    Legacy(LegacyClientNpcWaypointDocument),
+    #[serde(rename = "ffone.client-npc-waypoint-catalog.v2")]
+    Native(NativeClientNpcWaypointDocument),
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ClientNpcWaypointDocument {
-    schema: String,
+struct LegacyClientNpcWaypointDocument {
     source: ClientNpcWaypointProvenance,
     row_count: usize,
     rows: Vec<ClientNpcWaypointRow>,
 }
 
-/// Ordered native copy of clean `clientnpc.asset`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeClientNpcWaypointDocument {
+    rows: Vec<NativeClientNpcWaypointRow>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeClientNpcWaypointRow {
+    npc_type: i32,
+    client_position: [f32; 3],
+}
+
+/// Ordered mission destinations in client-world units, including the accepted baseline.
 ///
 /// Duplicate NPC types are intentional. `first_matching_type` therefore uses
 /// a linear source-order lookup just like `WorldDataContainer.GetClientNpcPos`.
 #[derive(Clone, Debug, Resource)]
 pub struct ClientNpcWaypointCatalog {
-    provenance: ClientNpcWaypointProvenance,
+    provenance: Option<ClientNpcWaypointProvenance>,
     rows: Box<[ClientNpcWaypointRow]>,
 }
 
 impl ClientNpcWaypointCatalog {
     pub fn open(locator: &AssetLocator) -> Result<Self, String> {
         let bytes = locator.read(CLIENT_NPC_WAYPOINT_CATALOG_PATH)?;
-        if bytes.len() as u64 != CLIENT_NPC_WAYPOINT_CATALOG_BYTES {
-            return Err(format!(
-                "client NPC waypoint catalog length mismatch: expected \
-                 {CLIENT_NPC_WAYPOINT_CATALOG_BYTES}, found {}",
-                bytes.len()
-            ));
-        }
-        let actual_sha256 = sha256_upper(&bytes);
-        if actual_sha256 != CLIENT_NPC_WAYPOINT_CATALOG_SHA256 {
-            return Err(format!(
-                "client NPC waypoint catalog SHA256 mismatch: expected \
-                 {CLIENT_NPC_WAYPOINT_CATALOG_SHA256}, found {actual_sha256}"
-            ));
-        }
         Self::from_json_bytes(&bytes)
     }
 
@@ -185,13 +193,35 @@ impl ClientNpcWaypointCatalog {
     }
 
     fn from_document(document: ClientNpcWaypointDocument) -> Result<Self, String> {
-        if document.schema != CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA {
-            return Err(format!(
-                "client NPC waypoint catalog must use schema \
-                 {CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA:?}, found {:?}",
-                document.schema
-            ));
+        let (provenance, rows) = match document {
+            ClientNpcWaypointDocument::Legacy(document) => {
+                Self::validate_legacy(&document)?;
+                (Some(document.source), document.rows)
+            }
+            ClientNpcWaypointDocument::Native(document) => {
+                let rows = document.rows.into_iter().enumerate().map(|(index, row)| {
+                    Ok(ClientNpcWaypointRow {
+                        row_index: u32::try_from(index)
+                            .map_err(|_| "too many client NPC waypoint rows")?,
+                        npc_type: row.npc_type,
+                        client_position: row.client_position,
+                    })
+                }).collect::<Result<Vec<_>, String>>()?;
+                (None, rows)
+            }
+        };
+        for row in &rows {
+            if !row.client_position_vec3().is_finite() {
+                return Err(format!(
+                    "client NPC waypoint row {} has non-finite client position {:?}",
+                    row.row_index, row.client_position
+                ));
+            }
         }
+        Ok(Self { provenance, rows: rows.into_boxed_slice() })
+    }
+
+    fn validate_legacy(document: &LegacyClientNpcWaypointDocument) -> Result<(), String> {
         let expected_provenance = expected_provenance();
         if document.source != expected_provenance {
             return Err(format!(
@@ -200,12 +230,10 @@ impl ClientNpcWaypointCatalog {
                 document.source
             ));
         }
-        if document.row_count != CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT
-            || document.rows.len() != CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT
+        if document.row_count != document.rows.len()
         {
             return Err(format!(
-                "client NPC waypoint catalog must contain exactly \
-                 {CLIENT_NPC_WAYPOINT_CATALOG_ROW_COUNT} rows, declared {}, found {}",
+                "client NPC waypoint row count mismatch: declared {}, found {}",
                 document.row_count,
                 document.rows.len()
             ));
@@ -217,22 +245,29 @@ impl ClientNpcWaypointCatalog {
                     row.row_index
                 ));
             }
-            if !row.client_position_vec3().is_finite() {
-                return Err(format!(
-                    "client NPC waypoint row {expected_index} has non-finite client position {:?}",
-                    row.client_position
-                ));
-            }
         }
-        Ok(Self {
-            provenance: document.source,
-            rows: document.rows.into_boxed_slice(),
-        })
+        Ok(())
+    }
+
+    /// Validate before migration and preserve JSON coordinates without an f32 round trip.
+    pub fn into_native_document(mut document: serde_json::Value) -> Result<serde_json::Value, String> {
+        let parsed = serde_json::from_value::<ClientNpcWaypointDocument>(document.clone())
+            .map_err(|error| format!("invalid client NPC waypoint catalog JSON: {error}"))?;
+        Self::from_document(parsed)?;
+        let root = document.as_object_mut().ok_or("Missing NPC waypoint document")?;
+        root.insert("schema".into(), CLIENT_NPC_WAYPOINT_CATALOG_SCHEMA.into());
+        root.remove("source");
+        root.remove("rowCount");
+        for row in root.get_mut("rows").and_then(serde_json::Value::as_array_mut)
+            .ok_or("Missing NPC waypoint rows")? {
+            row.as_object_mut().ok_or("Invalid NPC waypoint row")?.remove("rowIndex");
+        }
+        Ok(document)
     }
 
     #[must_use]
-    pub fn provenance(&self) -> &ClientNpcWaypointProvenance {
-        &self.provenance
+    pub fn provenance(&self) -> Option<&ClientNpcWaypointProvenance> {
+        self.provenance.as_ref()
     }
 
     #[must_use]
@@ -244,15 +279,6 @@ impl ClientNpcWaypointCatalog {
     pub fn first_matching_type(&self, npc_type: i32) -> Option<&ClientNpcWaypointRow> {
         self.rows.iter().find(|row| row.npc_type == npc_type)
     }
-}
-
-fn sha256_upper(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut encoded = String::with_capacity(64);
-    for byte in digest {
-        write!(&mut encoded, "{byte:02X}").expect("writing to a String cannot fail");
-    }
-    encoded
 }
 
 fn expected_provenance() -> ClientNpcWaypointProvenance {

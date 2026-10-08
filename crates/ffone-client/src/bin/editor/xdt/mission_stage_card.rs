@@ -59,6 +59,9 @@ pub(super) fn draw(
                 presentation::tr(l, lang, "mission.start", "Start")
             ));
         }
+        if value["m_iSUOutgoingTask"].as_i64().unwrap_or(0) == 0 {
+            header.push_str(&format!(" / {}", presentation::tr(l, lang, "mission.end", "End")));
+        }
         p.spawn(Node {
             width: percent(100),
             height: px(24. * scale),
@@ -122,7 +125,7 @@ pub(super) fn draw(
             .with_children(|p| {
                 let title_id = value["m_iHCurrentObjective"].as_i64().unwrap_or(0);
                 let title = mission_preview::string(e, l, lang, title_id);
-                fixed_text(p, f, excerpt(&title, 96), 46., 18., TEXT, scale);
+                p.spawn((Hit::Objective(row),Node{width:percent(100),..default()})).with_children(|p|fixed_text(p,f,excerpt(&title,96),46.,18.,TEXT,scale));
                 if collapsed {
                     return;
                 }
@@ -157,8 +160,6 @@ pub(super) fn draw(
         {
             p.spawn((
                 Hit::Preview(row),
-                Button,
-                Action::Mission(Command::InspectField(row, event.field.into())),
                 Node {
                     width: percent(100),
                     height: px(EVENT_HEIGHT * scale),
@@ -169,14 +170,26 @@ pub(super) fn draw(
                 },
             ))
             .with_children(|p| {
-                skin.speaker_badge(p, event.npc, value, 42. * scale);
+                if let Some(speaker) = mission_events::speaker(event.field) {
+                    p.spawn((Button, Action::Mission(Command::InspectField(row, speaker.into())),
+                        Node { flex_shrink: 0., ..default() }))
+                        .with_children(|p| skin.speaker_badge(p, event.npc, value, 42. * scale));
+                    let index = e.workspace.event_locales.get(&(row, event.field.into())).copied()
+                        .unwrap_or(usize::from(lang.effective == "ru"));
+                    p.spawn((Button, Action::Mission(Command::EventLocale(row, event.field.into(), 1-index)),
+                        Node { width: px(30. * scale), flex_shrink: 0., ..default() }))
+                        .with_children(|p| { fixed_text(p, f, if index == 0 { "EN" } else { "RU" }.into(),
+                            22., 11., CYAN, scale); });
+                } else {
+                    skin.speaker_badge(p, event.npc, value, 42. * scale);
+                }
                 let (image, ink, accent) = match event.channel {
                     Channel::Journal => {
                         let mut image = skin.card();
                         image.color = Color::srgb(0.48, 0.75, 0.98);
                         (image, TEXT, CYAN)
                     }
-                    Channel::Message => (
+                    Channel::Message | Channel::Email => (
                         sliced_image(skin.message.clone(), bevy::sprite::BorderRect::all(2.)),
                         TEXT,
                         BLUE,
@@ -188,6 +201,10 @@ pub(super) fn draw(
                     ),
                 };
                 p.spawn((
+                    Button,
+                    Action::Mission(if event.channel == Channel::Journal {
+                        Command::InspectField(row, event.field.into())
+                    } else if event.channel==Channel::Email {Command::EditEmail(row,event.field.into(),event.slot)} else { Command::EditEvent(row, event.field.into()) }),
                     image,
                     Node {
                         height: percent(100),
@@ -220,10 +237,14 @@ pub(super) fn draw(
                         accent,
                         scale,
                     );
+                    let mut preview_language = lang.clone();
+                    if let Some(index) = e.workspace.event_locales.get(&(row, event.field.into())) {
+                        preview_language.effective = if *index == 0 { "en" } else { "ru" }.into();
+                    }
                     fixed_text(
                         p,
                         f,
-                        excerpt(&mission_preview::event_text(e, l, lang, &event), 86),
+                        excerpt(&mission_preview::event_text(e, l, &preview_language, &event), 86),
                         35.,
                         14.,
                         ink,

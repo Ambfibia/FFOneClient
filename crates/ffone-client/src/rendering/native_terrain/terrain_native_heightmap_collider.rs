@@ -1,6 +1,15 @@
 use super::*;
 
 impl NativeHeightmapCollider {
+    /// Build an editor height query from the same shifted vertices as the runtime mesh.
+    pub fn from_samples(descriptor:&NativeTerrainDescriptor,samples:&[u16])->Result<Self,NativeTerrainError> {
+        Ok(Self {source_mesh:Handle::default(),source_descriptor_path:String::new(),
+            geometry:Arc::new(build_geometry(descriptor,samples)?),
+            width:descriptor.dimensions.width as usize,height:descriptor.dimensions.height as usize,
+            sample_spacing_x:descriptor.scale.sample_spacing_x as f32,sample_spacing_z:descriptor.scale.sample_spacing_z as f32,
+            terrain_size_x:descriptor.scale.extent_x as f32,terrain_size_z:descriptor.scale.extent_z as f32,
+            gameplay_attributes:None})
+    }
     #[cfg(test)]
     pub(crate) fn test_heightfield(width: usize, height: usize, heights: &[f32]) -> Self {
         assert_eq!(heights.len(), width * height);

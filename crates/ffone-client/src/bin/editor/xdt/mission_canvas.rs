@@ -40,6 +40,7 @@ pub(super) fn zoom_readout(p: &mut ChildSpawnerCommands, f: &EditorFonts, zoom: 
 pub(super) enum Hit {
     Canvas,
     Node(usize),
+    Objective(usize),
     Neighbor(usize),
     Port(usize, String),
     Edge(usize, String, usize),

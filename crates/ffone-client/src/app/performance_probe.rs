@@ -21,6 +21,7 @@ use ffone_client::{
 use std::time::{Duration, Instant};
 
 mod ability_presentation;
+mod traversal;
 mod audio_regression;
 mod ui_sfx_trace;
 mod npc_speech;
@@ -45,6 +46,8 @@ mod npc_floor;
 mod nano_regression;
 mod nano_hud;
 mod nano_attack_network;
+mod npc_skill_network;
+mod civilian_routes_network;
 mod vendor_regression;
 mod visual_effects;
 mod resolution_regression;

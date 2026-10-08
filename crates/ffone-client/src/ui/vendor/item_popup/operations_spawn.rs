@@ -287,6 +287,8 @@ pub(super) fn spawn(mut commands: Commands, server: Res<AssetServer>, assets: Re
                 root.spawn((
                     Button,
                     part,
+                    crate::ui::shared::controller::ControllerUiRepeat,
+                    crate::ui::shared::controller::ControllerUiDefault,
                     VendorUiRect::new(
                         88. + f32::from(index % 3) * 45.,
                         191. + f32::from(index / 3) * 20.,
@@ -365,6 +367,7 @@ pub(super) fn spawn(mut commands: Commands, server: Res<AssetServer>, assets: Re
             root.spawn((
                 Button,
                 Part::Close,
+                crate::ui::shared::controller::ControllerUiClose,
                 VendorUiRect::new(277., 0., 32., 32.).node(),
                 ImageNode::new(server.load(USER_EQUIP_CLOSE_PATH)),
             ));
@@ -377,6 +380,7 @@ pub(super) fn spawn(mut commands: Commands, server: Res<AssetServer>, assets: Re
             root.spawn((
                 Button,
                 Part::Accept,
+                crate::ui::shared::controller::ControllerUiDefault,
                 VendorUiRect::new(210., 390., 85., 28.).node(),
                 sliced_image(
                     server.load(USER_EQUIP_BUTTON_NORMAL_PATH),

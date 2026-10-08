@@ -31,10 +31,13 @@ pub struct NativeWorldCollider {
     #[serde(default)]
     pub source_model_path: String,
     pub is_trigger: bool,
+    #[serde(default = "collider_enabled_by_default")]
+    pub enabled: bool,
     pub expected_vertex_count: usize,
     pub expected_index_count: usize,
     pub transform: AuthoredWorldTransform,
 }
+fn collider_enabled_by_default() -> bool { true }
 
 /// Identifies the published model that owns a non-rendering world collider.
 /// Behaviour scripts use this alongside [`SpawnedNativeWorldVisual`] so a

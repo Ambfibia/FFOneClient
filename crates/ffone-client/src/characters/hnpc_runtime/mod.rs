@@ -35,6 +35,7 @@ use crate::{
 
 pub const HNPC_RUNTIME_CATALOG_PATH: &str = "data/hnpc/catalog.json";
 const HNPC_RUNTIME_CATALOG_SCHEMA: &str = "ffone.hnpc-runtime-catalog.v1";
+mod equipment;
 
 #[derive(Clone, Debug)]
 pub struct HnpcRuntimeAppearance {
@@ -44,6 +45,8 @@ pub struct HnpcRuntimeAppearance {
 
 #[derive(Clone, Debug)]
 pub struct HnpcRuntimeCatalog {
+    wardrobe: Arc<CharacterCreationAvatarItems>,
+    authored_looks: Arc<BTreeMap<usize, NativePlayerLook>>,
     appearances: BTreeMap<usize, HnpcRuntimeAppearance>,
     rig_catalog: NativePlayerRigCatalog,
     animation_ends: [Arc<BTreeMap<String, f32>>; 2],
@@ -85,10 +88,13 @@ impl HnpcRuntimeCatalog {
         }
 
         let mut textures = load_textures(locator, document.textures)?;
-        load_shared_skin_textures(locator, &mut textures)?;
-        let weapon_equip_types = load_weapon_equip_types(locator)?;
+        let wanted:std::collections::BTreeSet<_>=document.appearances.iter().flat_map(|a|a.parts.iter()).flat_map(|p|p.textures.iter().map(|name|name.to_ascii_lowercase())).chain(["m_skin".into(),"f_skin".into()]).filter(|name|!textures.contains_key(name)).collect();
+        load_shared_skin_textures(locator, &mut textures, &wanted)?;
+        let wardrobe: CharacterCreationAvatarItems = locator.read_json(CHARACTER_CREATION_AVATAR_ITEMS_PATH)?;
+        let weapon_equip_types = load_weapon_equip_types(&wardrobe)?;
         let mut rig_catalog = base_rig_catalog.clone();
         let mut appearances = BTreeMap::new();
+        let mut authored_looks = BTreeMap::new();
         for (position, appearance) in document.appearances.into_iter().enumerate() {
             if appearance.index != position {
                 return Err(format!(
@@ -115,6 +121,7 @@ impl HnpcRuntimeCatalog {
             }
 
             let mut native_parts = Vec::new();
+            let hat_type = appearance.parts.iter().find(|p| p.kind == HnpcPartKind::Hat).and_then(|p| p.equip_type);
             let mut seen_kinds = BTreeMap::new();
             let mut weapon_animation_profile = None;
             for part in appearance.parts {
@@ -166,7 +173,7 @@ impl HnpcRuntimeCatalog {
                         ));
                     }
                 }
-                if let Some(clothes_index) = part.kind.clothes_index() {
+                if let Some(clothes_index) = part.clothes_index() {
                     if part.actor_skin_combiner_clothes_index != Some(clothes_index) {
                         return Err(format!(
                             "HNPC appearance {} route {:?} has wrong ActorSkinCombiner clothes index",
@@ -188,7 +195,7 @@ impl HnpcRuntimeCatalog {
                         part.exact_route
                     ));
                 }
-                let assembly = if part.kind.clothes_index().is_some() {
+                let assembly = if part.clothes_index().is_some() {
                     NativePlayerPartAssembly::SharedSkin
                 } else {
                     NativePlayerPartAssembly::RigidAttachment
@@ -218,7 +225,7 @@ impl HnpcRuntimeCatalog {
                     PlayerRigGender::Male => "m_skin",
                     PlayerRigGender::Female => "f_skin",
                 };
-                let look = NativePlayerLook {
+                let mut look = NativePlayerLook {
                     identity: format!(
                         "HNPC appearance {} type {}",
                         appearance.index, appearance.legacy_type
@@ -232,6 +239,8 @@ impl HnpcRuntimeCatalog {
                     height_selector: appearance.height,
                     body_selector: appearance.shape,
                 };
+                authored_looks.insert(appearance.index,look.clone());
+                equipment::apply(&mut look, &wardrobe, hat_type)?;
                 look.validate()?;
                 Some(look)
             };
@@ -260,6 +269,8 @@ impl HnpcRuntimeCatalog {
             );
         }
         Ok(Self {
+            wardrobe: Arc::new(wardrobe),
+            authored_looks: Arc::new(authored_looks),
             appearances,
             animation_ends: animation_ends.try_into().unwrap(),
             animation_sounds: animation_sounds.try_into().unwrap(),
@@ -270,6 +281,11 @@ impl HnpcRuntimeCatalog {
     #[must_use]
     pub fn appearance(&self, index: usize) -> Option<&HnpcRuntimeAppearance> {
         self.appearances.get(&index)
+    }
+    /// Original wardrobe parts, including parts currently hidden by a hat.
+    pub fn authored_look(&self,index:usize)->Option<&NativePlayerLook>{self.authored_looks.get(&index)}
+    pub fn apply_equipment_visibility(&self, look: &mut NativePlayerLook, hat_type: Option<u8>) -> Result<(), String> {
+        equipment::apply(look, &self.wardrobe, hat_type)
     }
 
     /// Create an isolated preview catalog; the original runtime catalog stays unchanged.
@@ -362,10 +378,8 @@ fn read_hnpc_animation_ends(bytes: &[u8]) -> Result<Arc<BTreeMap<String, f32>>, 
 }
 
 fn load_weapon_equip_types(
-    locator: &AssetLocator,
+    document: &CharacterCreationAvatarItems,
 ) -> Result<BTreeMap<String, std::collections::BTreeSet<i32>>, String> {
-    let document: CharacterCreationAvatarItems =
-        locator.read_json(CHARACTER_CREATION_AVATAR_ITEMS_PATH)?;
     if document.schema != CHARACTER_CREATION_AVATAR_ITEMS_SCHEMA {
         return Err(format!(
             "HNPC weapon source has schema {:?}, expected {:?}",
@@ -563,9 +577,15 @@ struct HnpcPartDocument {
     textures: Vec<String>,
     #[serde(default)]
     actor_skin_combiner_clothes_index: Option<u8>,
+    #[serde(default)]
+    shared_skin:bool,
+    #[serde(default)]
+    equip_type: Option<u8>,
 }
 
 impl HnpcPartDocument {
+    fn clothes_index(&self)->Option<u8> {if self.kind==HnpcPartKind::Back && self.shared_skin {Some(5)} else {self.kind.clothes_index()}}
+
     fn validate_identity(&self, locator: &AssetLocator) -> Result<(), String> {
         if !self.exact_route.starts_with("wear/")
             || !self.exact_route.ends_with(".nif")
@@ -792,6 +812,7 @@ fn resolve_texture(
 fn load_shared_skin_textures(
     locator: &AssetLocator,
     textures: &mut BTreeMap<String, NativePlayerTexture>,
+    wanted:&std::collections::BTreeSet<String>,
 ) -> Result<(), String> {
     let document: CharacterCreationRuntimeTextures =
         locator.read_json(CHARACTER_CREATION_RUNTIME_TEXTURES_PATH)?;
@@ -801,7 +822,7 @@ fn load_shared_skin_textures(
             document.schema, CHARACTER_CREATION_RUNTIME_TEXTURES_SCHEMA
         ));
     }
-    for true_name in ["m_skin", "f_skin"] {
+    for true_name in wanted {
         let matches = document
             .textures
             .iter()
@@ -824,7 +845,7 @@ fn load_shared_skin_textures(
             ));
         }
         textures.insert(
-            true_name.to_owned(),
+            true_name.to_ascii_lowercase(),
             NativePlayerTexture {
                 path: contract.native_asset.path.clone(),
                 contract: (*contract).clone(),

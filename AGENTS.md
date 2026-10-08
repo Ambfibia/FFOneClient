@@ -28,4 +28,5 @@ and parity audits are not prerequisites.
 Active user bug tasks live in `docs/bugs/README.md`. For "исправляй Bug N", check
 that N is active, then read `docs/bugs/AGENTS.md` and `docs/bugs/bug-NNN.md`.
 Keep Bug IDs stable. Already fixed/code-fixed items are excluded by user request;
-the archived audit is not a work queue and does not require re-verification.
+delete resolved cards instead of archiving them. Archived bug records were removed
+at the user’s request; do not recreate them or reuse their IDs.

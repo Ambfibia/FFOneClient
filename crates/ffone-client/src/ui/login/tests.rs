@@ -18,6 +18,44 @@ fn spawned_app() -> App {
 }
 
 #[test]
+fn server_browser_renders_above_background_without_moving_centered_login() {
+    let mut app = spawned_app();
+    app.insert_resource(OptionUiModel::default())
+        .init_resource::<LoginBrowser>()
+        .init_resource::<browser_view::BrowserPopover>()
+        .init_resource::<LoginUiModel>()
+        .add_systems(Update, (update_login_layout, browser_view::bind_browser).chain());
+    app.world_mut().spawn((Window {
+        resolution: (1280, 720).into(),
+        ..default()
+    }, PrimaryWindow));
+    app.world_mut().resource_mut::<LoginUiModel>().visible = true;
+    app.update();
+    let mut panels = app.world_mut().query_filtered::<&Node, With<LoginPanel>>();
+    let panel = panels.single(app.world()).unwrap();
+    assert_eq!(panel.left, px((1280.0 - LOGIN_PANEL_SIZE.x) / 2.0));
+    assert_eq!(panel.top, px((720.0 - (LOGIN_PANEL_SIZE.y + 24.0)) / 2.0));
+    let mut browsers = app.world_mut().query_filtered::<(&Node, &UiTransform, &ZIndex), With<browser_view::BrowserPanel>>();
+    let (browser, transform, z) = browsers.single(app.world()).unwrap();
+    assert!(z.0 > 0, "full-screen backgrounds must not cover the server browser");
+    let Val::Px(left) = browser.left else { panic!("absolute browser position"); };
+    let actual_left = left + 140.0 * (1.0 - transform.scale.x);
+    assert!(actual_left > 640.0 + LOGIN_PANEL_SIZE.x / 2.0);
+    assert!(actual_left + 280.0 * transform.scale.x <= 1280.0);
+    app.world_mut().resource_mut::<LoginUiModel>().saved_account = Some("saved-player".into());
+    app.update();
+    let mut panels = app.world_mut().query_filtered::<&Node, With<LoginPanel>>();
+    let panel = panels.single(app.world()).unwrap();
+    assert_eq!(panel.height, px(LOGIN_PANEL_SIZE.y + 24.0));
+    assert_eq!(panel.top, px((720.0 - (LOGIN_PANEL_SIZE.y + 24.0)) / 2.0));
+    let mut submit = app.world_mut().query_filtered::<&Node, With<LoginSubmitButton>>();
+    assert_eq!(submit.single(app.world()).unwrap().top, px(159.0));
+    app.world_mut().resource_mut::<LoginUiModel>().saved_account = None;
+    app.update();
+    assert_eq!(submit.single(app.world()).unwrap().top, px(159.0), "editing must not shift the actions");
+}
+
+#[test]
 fn every_login_text_entity_has_semantic_ownership() {
     let mut app = spawned_app();
 
@@ -261,6 +299,8 @@ fn clean_draw_order_is_fallback_loaded_panel() {
         .single(app.world())
         .expect("root children")
         .iter()
+        // The browser owns a higher local ZIndex; preserve the background/form order.
+        .filter(|entity| app.world().get::<browser_view::BrowserPanel>(*entity).is_none())
         .collect::<Vec<_>>();
     assert_eq!(children.len(), 3);
     assert!(
@@ -868,4 +908,101 @@ fn registration_matches_native_action_column_without_discord() {
     assert!(lower.iter().all(|(node, _, _)| {
         node.width == Val::Auto && node.height == px(35.0)
     }));
+}
+
+#[test]
+fn saved_account_requires_explicit_matching_selection_before_submit() {
+    let mut model = LoginUiModel { username: "player".into(), ..default() };
+    let mut outbox = LoginUiOutbox::default();
+    queue_login(&mut model, &mut outbox);
+    assert!(outbox.requests.is_empty());
+    model.saved_account = Some("other".into());
+    queue_login(&mut model, &mut outbox);
+    assert!(outbox.requests.is_empty());
+    model.saved_account = Some("player".into());
+    queue_login(&mut model, &mut outbox);
+    assert_eq!(outbox.requests.len(), 1);
+    assert!(model.busy);
+    assert!(outbox.requests[0].password.is_empty());
+}
+
+#[test]
+fn account_list_selects_without_login_and_edit_restores_credentials() {
+    let mut app = spawned_app();
+    let mut browser = LoginBrowser::default();
+    browser.selected = 0;
+    browser.accounts = vec![browser::SavedAccount { server: browser.servers[0].key().into(), username: "saved-player".into() }];
+    app.insert_resource(browser).insert_resource(OptionUiModel::default())
+        .insert_resource(LoginUiModel { visible: true, ..default() })
+        .init_resource::<account_view::AccountForm>()
+        .init_resource::<LoginUiOutbox>()
+        .add_systems(Update, (account_view::interactions, account_view::bind).chain());
+    app.update();
+    assert_eq!(app.world().resource::<LoginUiModel>().saved_account.as_deref(), Some("saved-player"));
+    let select = app.world_mut().spawn((Interaction::Pressed, account_view::Action::Select("saved-player".into()))).id();
+    app.update();
+    assert!(!app.world().resource::<LoginUiModel>().busy);
+    assert!(app.world().resource::<LoginUiOutbox>().requests.is_empty());
+    let mut menus = app.world_mut().query_filtered::<&Node, With<account_view::AccountMenu>>();
+    let menu = menus.single(app.world()).unwrap();
+    assert_eq!(menu.height, percent(100));
+    assert_eq!(menu.overflow, Overflow::scroll_y());
+    app.world_mut().entity_mut(select).despawn();
+    app.world_mut().spawn((Interaction::Pressed, account_view::Action::Edit("saved-player".into())));
+    app.update();
+    let model = app.world().resource::<LoginUiModel>();
+    assert!(model.saved_account.is_none());
+    assert_eq!(model.username, "saved-player");
+    assert!(model.password.is_empty());
+    assert_eq!(model.focused, LoginField::Password);
+    let mut fields = app.world_mut().query_filtered::<&Node, With<LoginPasswordField>>();
+    assert_eq!(fields.single(app.world()).unwrap().display, Display::Flex);
+    let mut labels = app.world_mut().query_filtered::<&Node, With<account_view::CredentialLabel>>();
+    assert!(labels.iter(app.world()).all(|n| n.display == Display::Flex));
+    app.world_mut().spawn((Interaction::Pressed, account_view::Action::Back));
+    app.update();
+    assert_eq!(app.world().resource::<LoginUiModel>().saved_account.as_deref(), Some("saved-player"));
+}
+
+#[test]
+fn browser_hover_rebinds_slice_border_with_the_texture() {
+    let mut app = spawned_app();
+    app.init_resource::<LoginBrowser>().add_systems(Update, browser_view::button_states);
+    let entity = {
+        let assets = app.world().resource::<LoginUiAssets>();
+        let image = browser_view::field_image(assets);
+        app.world_mut().spawn((Interaction::Hovered, browser_view::Action::OpenAddServer, image)).id()
+    };
+    app.update();
+    let image = app.world().get::<ImageNode>(entity).unwrap();
+    let NodeImageMode::Sliced(slicer) = &image.image_mode else { panic!("sliced button"); };
+    assert_eq!(slicer.border, LOGIN_BUTTON_BORDER);
+    app.world_mut().entity_mut(entity).insert(Interaction::None);
+    app.update();
+    let image = app.world().get::<ImageNode>(entity).unwrap();
+    let NodeImageMode::Sliced(slicer) = &image.image_mode else { panic!("sliced field"); };
+    assert_eq!(slicer.border, LOGIN_TEXT_FIELD_BORDER);
+}
+
+#[test]
+fn server_address_keeps_input_skin_and_add_uses_login_button_states() {
+    let mut app = spawned_app();
+    app.init_resource::<LoginBrowser>().add_systems(Update, browser_view::button_states);
+    let assets = app.world().resource::<LoginUiAssets>().clone();
+    let input = app.world_mut().spawn((Interaction::Hovered, browser_view::Action::ServerInput,
+        browser_view::field_image(&assets))).id();
+    let add = app.world_mut().spawn((Interaction::None, browser_view::Action::AddServer,
+        browser_view::field_image(&assets))).id();
+    app.update();
+    assert_eq!(app.world().get::<ImageNode>(input).unwrap().image, assets.text_field);
+    for (state, expected) in [(Interaction::None, assets.button),
+        (Interaction::Hovered, assets.button_over), (Interaction::Pressed, assets.button_active)] {
+        app.world_mut().entity_mut(add).insert(state);
+        app.update();
+        let image = app.world().get::<ImageNode>(add).unwrap();
+        assert_eq!(image.image, expected);
+        let NodeImageMode::Sliced(slicer) = &image.image_mode else {panic!("button slice");};
+        assert_eq!(slicer.border, LOGIN_BUTTON_BORDER);
+        assert_eq!(app.world().get::<ImageNode>(input).unwrap().image, assets.text_field);
+    }
 }

@@ -120,7 +120,7 @@ pub(super) fn setup(
         .expect("resolve the production default creator");
     let gender = tutorial_player_gender_from_protocol(creator.style.gender)
         .expect("GPU proof creator must use a supported player gender");
-    let character = CharacterSummary {
+    let mut character = CharacterSummary {
         slot: 1,
         level: 1,
         pc_uid: 1,
@@ -144,6 +144,18 @@ pub(super) fn setup(
         },
         equipment: [EquippedItem0104::default(); CHARACTER_EQUIP_SLOT_COUNT_0104],
     };
+    if let Ok(value) = env::var("FFONE_PLAYER_PREVIEW_EQUIPMENT") {
+        for entry in value.split(',').filter(|entry| !entry.is_empty()) {
+            let (slot, item) = entry.split_once(':').expect("preview equipment uses SLOT:ITEM_ID");
+            let slot: usize = slot.parse().expect("preview equipment slot");
+            assert!(slot < CHARACTER_EQUIP_SLOT_COUNT_0104, "preview equipment slot out of range");
+            character.equipment[slot] = EquippedItem0104 {
+                item_type: slot as i16,
+                item_id: item.parse().expect("preview equipment item id"),
+                ..default()
+            };
+        }
+    }
     let spawned = spawn_tutorial_selected_player_rig(
         commands,
         assets,

@@ -1,6 +1,8 @@
 //! Key-first EN/RU localization with deterministic English fallback.
 
 mod images;
+mod mission_links;
+pub use mission_links::mission_text_links;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -52,7 +54,7 @@ use localization::{
     apply_localized_texts, refresh_localized_voice_players, localized_voice_path, validate_locale,
     normalize_language, resolve_locale
 };
-pub use types::UiTextAutoFit;
+pub use types::{UiTextAutoFit, UiTextNoAutoFit};
 use types::UiTextFitRegion;
 use operations::{
     fit_region_height, fixed_text_region, admit_bounded_ui_text, auto_fit_ui_text,

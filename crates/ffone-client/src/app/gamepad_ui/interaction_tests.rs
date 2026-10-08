@@ -115,6 +115,22 @@ fn gamepad_confirm_releases_represses_and_holds_without_repeated_click_edges() {
 }
 
 #[test]
+fn gamepad_reconnect_resets_the_direction_repeat_delay() {
+    let mut app = fixture(ClientState::CharacterCreate);
+    let root = app.world_mut().spawn(Node::default()).id();
+    let first = button(&mut app, root, 30.0, 30.0, 1);
+    let second = button(&mut app, root, 30.0, 90.0, 2);
+    frame(&mut app, &[GamepadButton::DPadDown]);
+    assert_eq!(app.world().resource::<PadUiFocus>().entity, Some(second));
+    app.world_mut().resource_mut::<GamepadActionState>().sample(&InputSettings::default(), None);
+    app.update();
+    assert_eq!(app.world().resource::<PadUiFocus>().entity, None);
+    frame(&mut app, &[GamepadButton::DPadDown]);
+    assert_ne!(app.world().resource::<PadUiFocus>().entity, Some(first));
+    assert_eq!(app.world().resource::<PadUiFocus>().entity, Some(second));
+}
+
+#[test]
 fn gamepad_repeat_is_opt_in_and_does_not_press_a_new_target_while_held() {
     let mut app = fixture(ClientState::CharacterCreate);
     let root = app.world_mut().spawn(Node::default()).id();
@@ -341,6 +357,32 @@ fn gamepad_disconnect_cancels_cannon_charge_without_firing() {
         .resource_mut::<LauncherUiOutbox>()
         .pop_front()
     {
+        assert!(!matches!(effect, LauncherUiEffect::StartLauncher(_)));
+    }
+}
+
+#[test]
+fn gamepad_same_frame_reconnect_cancels_cannon_charge_without_firing() {
+    use bevy::input::{InputPlugin, InputSystems};
+    use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent};
+    use ffone_client::launcher_ui::{LauncherUiEffect, LauncherUiOutbox};
+    let mut app = launcher_fixture();
+    app.add_plugins(InputPlugin)
+        .add_systems(PreUpdate, super::super::gamepad::sample_gamepad_actions.after(InputSystems));
+    let device = app.world_mut().spawn_empty().id();
+    let connect = || GamepadConnectionEvent::new(device, GamepadConnection::Connected {
+        name: "Cannon regression pad".into(), vendor_id: None, product_id: None,
+    });
+    app.world_mut().write_message(connect());
+    app.update();
+    app.world_mut().get_mut::<Gamepad>(device).unwrap().digital_mut().press(GamepadButton::South);
+    app.update();
+    assert!(app.world().resource::<LauncherUiModel>().charging);
+    app.world_mut().write_message(GamepadConnectionEvent::new(device, GamepadConnection::Disconnected));
+    app.world_mut().write_message(connect());
+    app.update();
+    assert!(!app.world().resource::<LauncherUiModel>().visible());
+    while let Some(effect) = app.world_mut().resource_mut::<LauncherUiOutbox>().pop_front() {
         assert!(!matches!(effect, LauncherUiEffect::StartLauncher(_)));
     }
 }

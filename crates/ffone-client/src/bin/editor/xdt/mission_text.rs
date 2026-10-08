@@ -8,17 +8,45 @@ impl XdtEditor {
     pub(super) fn start_mission_text_edit(&mut self,field:&str,shared:bool)->Result<(),String>{
         let (table,id)=self.reference_target(field).ok_or("Missing text table")?;
         if id.is_some(){return Err("Select a text reference".into());}
-        let row=self.field_value(field).and_then(Value::as_u64).ok_or("Missing text index")? as usize;
+        let row=self.field_value(field).and_then(Value::as_u64)
+            .or_else(||relations::optional_index(field).then_some(0)).ok_or("Missing text index")? as usize;
         if row == 0 && relations::optional_index(field) {
             return self.start_quick(field);
         }
         let value=self.document.pointer(&self.tables[table].pointer).and_then(|v|v.get(row)).cloned().ok_or("Missing text record")?;
         let fallback=value["m_pstrNameString"].as_str().or_else(||value["m_strName"].as_str()).unwrap_or_default().to_owned();
+        let semantic=match field {
+            "m_iHMissionName"=>Some("title"),"m_iHCurrentObjective"=>Some("objective"),
+            "m_iDetaileMissionDesc"=>Some("offer_description"),"m_iDetailedTaskDesc"=>Some("task_description"),
+            "m_iMissionSummary"=>Some("mission_summary"),"m_iMissionCompleteSummary"=>Some("mission_complete_summary"),
+            "m_iDetaileMissionCompleteSummary"=>Some("completion_description"),_=>None,
+        }.and_then(|name|{
+            let task=self.row.and_then(|r|self.rows().get(r)).and_then(|r|r["m_iHTaskID"].as_i64())
+                .or_else(||self.workspace.creation.iter().find_map(|frame|frame.row.and_then(|r|self.document.pointer(&self.tables[frame.table].pointer)?.get(r)?["m_iHTaskID"].as_i64())));
+            task.map(|id|format!("content.mission.task.{id}.{name}"))
+        });
+        let key=format!("content.tabledata.mission.mission_string.{row}.str_name_string");
+        // Read saved translations when the user explicitly opens the text. This also
+        // establishes the baseline for a subsequent intentional edit of those keys.
+        let aliases:Vec<_>=ffone_client::localization::mission_text_links(&self.document).into_iter()
+            .filter_map(|(alias,target)|(target==key).then_some(alias)).chain(std::iter::once(key.clone())).collect();
+        if let Some(root)=self.path.parent().and_then(Path::parent).and_then(Path::parent) {
+            for (i,locale) in ["en","ru"].into_iter().enumerate(){
+                if let Some(saved)=fs::read(root.join(format!("localization/{locale}.json"))).ok().and_then(|bytes|serde_json::from_slice::<Value>(&bytes).ok()){
+                    for alias in &aliases {
+                        if self.workspace.locale_drafts.contains_key(alias){continue;}
+                        if let Some(text)=saved["entries"][alias].as_str(){self.workspace.locale_base[i].insert(alias.clone(),text.to_owned());}
+                        else{self.workspace.locale_base[i].remove(alias);}
+                    }
+                }
+            }
+        }
         self.start_quick(field)?;
         self.workspace.quick_existing=shared.then_some(row);
         self.draft.as_mut().unwrap().value=value;
-        let key=format!("content.tabledata.mission.mission_string.{row}.str_name_string");
         let values=std::array::from_fn(|i|self.workspace.locale_drafts.get(&key).and_then(|v|v[i].clone())
+            .or_else(||semantic.as_ref().and_then(|alias|self.workspace.locale_drafts.get(alias).and_then(|v|v[i].clone())))
+            .or_else(||semantic.as_ref().and_then(|alias|self.workspace.locale_base[i].get(alias).cloned()))
             .or_else(||self.workspace.locale_base[i].get(&key).cloned()).unwrap_or_else(||fallback.clone()));
         self.workspace.quick_text=Some(TextDraft{values});
         self.begin(Focus::Locale(1));
@@ -39,7 +67,9 @@ impl XdtEditor {
         let table=&self.tables[self.table].label;
         let mut keys=Vec::new();
         if table.ends_with("/m_pMissionStringData") {
-            keys.push(format!("content.tabledata.mission.mission_string.{row}.str_name_string"));
+            let source=format!("content.tabledata.mission.mission_string.{row}.str_name_string");
+            keys.push(source.clone());
+            keys.extend(ffone_client::localization::mission_text_links(&self.document).into_iter().filter_map(|(key,target)|(target==source).then_some(key)));
             if let Some(origin)=&self.workspace.quick {
                 let task=self.document.pointer(&self.tables[origin.table].pointer).and_then(|v|v.get(origin.row)).and_then(|v|v["m_iHTaskID"].as_i64());
                 let field=match origin.field.as_str(){"m_iHMissionName"=>Some("title"),"m_iHCurrentObjective"=>Some("objective"),_=>None};
@@ -104,27 +134,13 @@ impl XdtEditor {
             for (key,text) in &self.workspace.locale_drafts{
                 let current=entries.get(key).and_then(Value::as_str);
                 let base=self.workspace.locale_base[index].get(key).map(String::as_str);
-                if current!=base&&current!=text[index].as_deref(){return Err(format!("Localization conflict: {locale} {key}"));}
+                // A concurrently saved localization is authoritative over an older table draft.
+                if current!=base&&current!=text[index].as_deref(){continue;}
                 if let Some(text)=&text[index]{entries.insert(key.clone(),Value::from(text.clone()));}
                 else{entries.remove(key);}
             }
             result.push((path,value));
         }
         Ok(result)
-    }
-    pub(super) fn save_locales(&mut self,prepared:Vec<(PathBuf,Value)>)->Result<(),String>{
-        // All conflicts were checked before TableData is written. Successful files are
-        // remembered so a partial disk failure can be retried without duplicate records.
-        for (index,(path,value)) in prepared.into_iter().enumerate(){
-            let mut temp=tempfile::NamedTempFile::new_in(path.parent().unwrap()).map_err(|e|e.to_string())?;
-            serde_json::to_writer_pretty(&mut temp,&value).map_err(|e|e.to_string())?;
-            temp.write_all(b"\n").map_err(|e|e.to_string())?;
-            temp.as_file().sync_all().map_err(|e|e.to_string())?;
-            temp.persist(&path).map_err(|e|format!("Localization save incomplete ({}): {e}",path.display()))?;
-            self.workspace.locale_base[index]=value["entries"].as_object().unwrap().iter().filter_map(|(k,v)|v.as_str().map(|v|(k.clone(),v.into()))).collect();
-        }
-        self.workspace.locale_drafts.clear();
-        self.rebuild_search_index();
-        Ok(())
     }
 }

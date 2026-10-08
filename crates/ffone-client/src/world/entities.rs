@@ -149,6 +149,7 @@ pub(super) fn spawn_native_world_scene_root(
         .spawn((
             Name::new(scene.name.clone()),
             NativeWorldSceneEntity,
+            scene.square_settings.clone().unwrap_or_default(),
             NativeWorldSceneRoot {
                 name: scene.name.clone(),
                 tile: scene.tile,
@@ -365,6 +366,7 @@ pub fn spawn_native_world_scene(
     let mut colliders =
         Vec::with_capacity(scene.colliders.len() + usize::from(scene.native_terrain.is_some()));
     for collider in &scene.colliders {
+        if !collider.enabled { continue; }
         colliders.push(spawn_native_world_collider(
             commands,
             asset_server,

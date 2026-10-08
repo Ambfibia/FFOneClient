@@ -366,8 +366,17 @@ pub fn update_world_trigger_volumes(
     }
 }
 
-/// Advance native zipline/rope traversal and publish the registered protocol
-/// packet at the same 0.3 second cadence as ordinary avatar movement.
+/// One cable Move awaiting authored collision and the post-Move hang offset.
+#[derive(Component)]
+pub struct WorldZiplineStep {
+    detached: bool,
+    finished: bool,
+}
+
+/// Submit the cable's CharacterController.Move. EpUpdate first moves the root
+/// to the cable (with the CCT bias), then subtracts the measured hang height.
+/// Keeping that second operation after collision preserves walls/ceilings and
+/// makes the ZIPLINE packet describe the rendered position.
 pub fn update_world_zipline_traversals(
     mut commands: Commands,
     time: Res<Time>,
@@ -380,7 +389,6 @@ pub fn update_world_zipline_traversals(
     )>,
     rigs: Query<(&TutorialSelectedPlayerRig, &NativePlayerRigBones)>,
     bone_transforms: Query<&GlobalTransform>,
-    mut gameplay: ResMut<WorldGameplayIntentQueue>,
 ) {
     let delta = time.delta_secs().max(0.0);
     for (entity, mut transform, mut controller, mut traversal) in &mut traversals {
@@ -390,7 +398,7 @@ pub fn update_world_zipline_traversals(
                 let toe = bones.unique_by_true_name("Bip01 L Toe0")?;
                 let height = bone_transforms.get(hand).ok()?.translation().y
                     - bone_transforms.get(toe).ok()?.translation().y;
-                (height.is_finite() && height > 0.01).then_some(height)
+                height.is_finite().then_some(height)
             })?
         }) {
             traversal.hang_height = height;
@@ -398,17 +406,12 @@ pub fn update_world_zipline_traversals(
         let delta_position = traversal.end - traversal.start;
         let maximum_distance = delta_position.length();
         let direction = delta_position.normalize_or_zero();
-        if input.jump_just_pressed {
-            controller.finish_scripted_traversal(direction * traversal.speed);
-            commands.entity(entity).remove::<WorldZiplineTraversal>();
-            continue;
-        }
-        traversal.travelled = (traversal.travelled + traversal.speed * delta).min(maximum_distance);
+        traversal.travelled += traversal.speed * delta;
         traversal.packet_elapsed += delta;
-        transform.translation = traversal.start
-            + direction * traversal.travelled.min(maximum_distance)
-            - Vec3::Y * traversal.hang_height;
-        controller.velocity = direction * traversal.speed;
+        let cable_position = traversal.start + direction * traversal.travelled
+            - Vec3::splat(crate::movement::LEGACY_CHARACTER_MOVE_BIAS);
+        controller.submit_scripted_move(cable_position - transform.translation, delta);
+        transform.translation = cable_position;
         let horizontal = Vec3::new(direction.x, 0.0, direction.z).normalize_or_zero();
         if horizontal.length_squared() > f32::EPSILON {
             let unity_direction = unity_to_native_vector(horizontal);
@@ -419,31 +422,59 @@ pub fn update_world_zipline_traversals(
                 .rotation
                 .slerp(target, (delta * 4.0).clamp(0.0, 1.0));
         }
-        if traversal.packet_elapsed >= crate::movement::LEGACY_PACKET_SEND_INTERVAL {
-            let protocol_velocity = ProtocolMoveVelocity::from_native(controller.velocity).raw();
-            let request = PcZiplineRequest0104 {
-                client_time: 0,
-                start_position: ProtocolPosition::from_native(traversal.start).raw(),
-                moved_distance: traversal.travelled,
-                maximum_distance,
-                dummy: 0.0,
-                position: ProtocolPosition::from_native(transform.translation).raw(),
-                velocity: protocol_velocity,
-                down: i32::from(traversal.end.y < traversal.start.y),
-                roll_max: 30,
-                roll: 0,
-                angle: LegacyUnityHeadingDegrees::new(controller.yaw_degrees)
-                    .to_protocol()
-                    .degrees(),
-                speed: (traversal.speed * 100.0) as i32,
-            };
+        // Source steps the cable before checking jump and clamps only the packet
+        // distance at its endpoint. No horizontal launch impulse on detachment.
+        let finished = traversal.travelled > maximum_distance || input.jump_just_pressed;
+        commands.entity(entity).insert(WorldZiplineStep {
+            detached: input.jump_just_pressed,
+            finished,
+        });
+    }
+}
+
+/// Complete EpUpdate after the actual CCT result, before avatar presentation.
+pub fn finish_world_zipline_steps(
+    mut commands: Commands,
+    mut traversals: Query<(Entity, &mut Transform, &mut crate::movement::LegacyPlayerController,
+        &mut WorldZiplineTraversal, &WorldZiplineStep)>,
+    mut gameplay: ResMut<WorldGameplayIntentQueue>,
+) {
+    for (entity, mut transform, mut controller, mut traversal, step) in &mut traversals {
+        transform.translation.y -= traversal.hang_height;
+        // Cable contact never releases its movement owner; ordinary floor
+        // grounding must not show weapons or replace ropedown mid-ride.
+        controller.set_grounded(false);
+        controller.velocity = (traversal.end - traversal.start).normalize_or_zero() * traversal.speed;
+        let finished = step.finished;
+        traversal.travelled = traversal.travelled.min(traversal.start.distance(traversal.end));
+        if finished || traversal.packet_elapsed >= crate::movement::LEGACY_PACKET_SEND_INTERVAL {
+            let request = world_zipline_request(&traversal, transform.translation,
+                controller.yaw_degrees, step.detached);
             let _ = gameplay.push(packet::P_CL2FE_REQ_PC_ZIPLINE, &request);
             traversal.packet_elapsed = 0.0;
         }
-        if traversal.travelled >= maximum_distance {
-            controller.finish_scripted_traversal(direction * traversal.speed);
+        if finished {
+            controller.finish_scripted_traversal_with_jump();
             commands.entity(entity).remove::<WorldZiplineTraversal>();
         }
+        commands.entity(entity).remove::<WorldZiplineStep>();
+    }
+}
+
+pub(super) fn world_zipline_request(
+    traversal: &WorldZiplineTraversal, position: Vec3, yaw: f32, detached: bool,
+) -> PcZiplineRequest0104 {
+    PcZiplineRequest0104 {
+        client_time: 0,
+        start_position: ProtocolPosition::from_native(traversal.start).raw(),
+        moved_distance: traversal.travelled,
+        maximum_distance: traversal.start.distance(traversal.end),
+        dummy: 0.0,
+        position: ProtocolPosition::from_native(position).raw(),
+        velocity: ProtocolMoveVelocity::from_native((traversal.end - traversal.start).normalize_or_zero()).raw(),
+        down: i32::from(detached), roll_max: 30, roll: 0,
+        angle: LegacyUnityHeadingDegrees::new(yaw).to_protocol().degrees(),
+        speed: (traversal.speed * 100.0) as i32,
     }
 }
 

@@ -189,6 +189,8 @@ pub(super) fn navigate_gamepad_ui(
     if !pad.connected() {
         focus.entity = None;
         focus.held_entity = None;
+        focus.direction = Vec2::ZERO;
+        focus.next_repeat = 0.0;
         menu.0 = false;
         return;
     }

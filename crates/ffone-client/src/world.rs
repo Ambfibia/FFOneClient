@@ -88,6 +88,8 @@ mod input_resolve_authored_world_ground;
 mod player_contact_shadow;
 mod input_resolve_authored_wall_substep;
 mod terrain;
+mod square_settings;
+pub use square_settings::{NativeSquareSettings, square_at};
 mod codec;
 mod containers;
 mod models;

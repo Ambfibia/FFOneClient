@@ -515,9 +515,25 @@ impl WorldMissionRuntime {
         quest_inventory: &[ItemBase0104],
         content: &TutorialMissionContent,
     ) -> (bool, bool) {
+        self.npc_mission_availability(npc_type,None,player_level,guide,owned_nanos,quest_inventory,content)
+    }
+
+    #[must_use]
+    pub fn npc_mission_markers_on(
+        &self,npc_type:i32,surface:MissionMarkerSurface,player_level:i32,guide:i32,
+        owned_nanos:&BTreeSet<i32>,quest_inventory:&[ItemBase0104],content:&TutorialMissionContent,
+    )->(bool,bool) {
+        self.npc_mission_availability(npc_type,Some(surface),player_level,guide,owned_nanos,quest_inventory,content)
+    }
+
+    fn npc_mission_availability(
+        &self,npc_type:i32,surface:Option<MissionMarkerSurface>,player_level:i32,guide:i32,
+        owned_nanos:&BTreeSet<i32>,quest_inventory:&[ItemBase0104],content:&TutorialMissionContent,
+    )->(bool,bool) {
         let mut available = false;
         let mut advance_available = false;
         for definition in content.missions_for_npc(npc_type) {
+            if surface.is_some_and(|surface|!definition.provenance.marker_visibility.visible_on(surface)) {continue;}
             available |= definition.provenance.start_npc_type == npc_type
                 && self.can_start_task(
                     definition,
@@ -559,6 +575,7 @@ impl WorldMissionRuntime {
         let mut availability = BTreeMap::<i32, (bool, bool)>::new();
         for definition in content.missions() {
             let row = &definition.provenance;
+            if !row.marker_visibility.visible_on(MissionMarkerSurface::WorldMap) {continue;}
             if row.start_npc_type > 0
                 && self.can_start_task(
                     definition,

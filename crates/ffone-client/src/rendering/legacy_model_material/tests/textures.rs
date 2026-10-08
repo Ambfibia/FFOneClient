@@ -145,7 +145,7 @@ fn actor_skin_same_name_different_source_chain_uses_runtime_texture_authority() 
 #[test]
 fn declared_null_npc_main_texture_retains_its_runtime_assignment_slot() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../assets/game/characters/npcs/npc_fusion_johnnytest/fusion_johnnytest.glb");
+        .join("../../assets/game/characters/fusions/npc_fusion_johnnytest/fusion_johnnytest.glb");
     let bytes = std::fs::read(path).unwrap();
     let length = u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize;
     let document: Value = serde_json::from_slice(&bytes[20..20 + length]).unwrap();
@@ -209,9 +209,15 @@ fn external_texture_uri_allows_only_canonical_published_parent_routes() {
     validate_runtime_texture_binding(&shared_set).unwrap();
 
     for uri in [
+        "../../../back_ampfibiantendrils/models/back_ampfibiantendrils/back_ampfibiantendrils.textures/ToonRamp9.png",
+        "../../../../back/back_ampfibiantendrils/models/back_ampfibiantendrils/back_ampfibiantendrils.textures/ToonRamp9.mips/mip-01.png",
+        "../../../../back/back_benmummybandages/textures/back_benmummyhelmet.png",
+        "../../../shoes_colorshoes/textures/link_b.png",
         "../../../effects/shared/textures/npc_dexter_variant_02.png",
         "../../shared/textures/npc_dexter_variant_02.png",
         "../nanomachine/textures/shared/npc_dexter_variant_02.png",
+        "../npc_mandroid1/npc_mandroid1.textures/npc_mandroid1.png",
+        "../npc_mandroid1/npc_mandroid1.textures/npc_mandroid1.mips/mip-01.png",
         "../../../../../characters/npcs/nanomachine/textures/shared/npc_dexter_variant_02.png",
     ] {
         let shared = serde_json::from_value::<MaterialTextureBinding>(test_assigned_binding(
@@ -225,9 +231,13 @@ fn external_texture_uri_allows_only_canonical_published_parent_routes() {
         validate_runtime_texture_binding(&shared).unwrap();
     }
     for uri in [
+        "../../../back_ampfibiantendrils/models/back_other/back_other.textures/ToonRamp9.png",
+        "../../../back_ampfibiantendrils/models/back_ampfibiantendrils/back_other.textures/ToonRamp9.png",
         "../../../effects/shared/textures/../outside.png",
         "../../../audio/shared/textures/npc_dexter.png",
         "../arbitrary/npc_dexter.png",
+        "../npc_mandroid1/npc_other.textures/npc_mandroid1.png",
+        "../npc_mandroid1/npc_mandroid1.textures/../outside.png",
     ] {
         assert!(!is_safe_relative_png_uri(uri), "accepted {uri}");
     }

@@ -94,6 +94,11 @@ pub(super) struct PreviewRoot;
 #[derive(Component)]
 pub(super) struct PreviewCamera;
 
+#[derive(Component)]
+pub(super) struct NpcInspectorTabs;
+#[derive(Component)]
+pub(super) struct NpcEditSection;
+
 #[derive(Debug, Resource)]
 pub(super) struct OrbitCamera {
     pub(super) yaw: f32,
@@ -167,6 +172,7 @@ pub(super) enum DynamicTextRole {
     InspectorSource,
     InspectorGeometry,
     InspectorTextures,
+    InspectorPlacements,
     AnimationPage,
     AnimationSlot(usize),
     Playback,

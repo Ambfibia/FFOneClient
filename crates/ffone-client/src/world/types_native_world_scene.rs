@@ -147,9 +147,15 @@ pub struct NativeWorldScene {
     pub colliders: Vec<NativeWorldCollider>,
     #[serde(default)]
     pub native_terrain: Option<NativeWorldTerrainInstance>,
+    #[serde(default)]
+    pub square_settings: Option<NativeSquareSettings>,
 }
 
 impl NativeWorldScene {
+    /// Uses the production presentation policy for native authoring previews.
+    pub fn visual_has_presentation(&self, visual: &NativeWorldVisual) -> bool {
+        !is_legacy_non_presenting_visual(self, visual)
+    }
     pub fn from_json_slice(bytes: &[u8]) -> Result<Self, NativeWorldSceneError> {
         Self::from_json_slice_with_policy(bytes, true)
     }
@@ -299,6 +305,7 @@ impl NativeWorldScene {
         let Some(instance) = self.native_terrain.as_mut() else {
             return Ok(());
         };
+        if instance.editor_authored { return Ok(()); }
         let (Some(relative), Some(expected_hash)) = (
             instance.scene_instance_path.as_deref(),
             instance.scene_instance_blake3.as_deref(),
@@ -341,6 +348,7 @@ impl NativeWorldScene {
     }
 
     pub fn validate(&self) -> Result<(), NativeWorldSceneError> {
+        if let Some(settings)=&self.square_settings { settings.validate()?; }
         self.validate_with_policy(true)
     }
 
@@ -348,6 +356,7 @@ impl NativeWorldScene {
         &self,
         require_scene_instance: bool,
     ) -> Result<(), NativeWorldSceneError> {
+        if let Some(settings)=&self.square_settings { settings.validate()?; }
         if !matches!(
             self.schema.as_str(),
             NATIVE_WORLD_SCENE_SCHEMA | LEGACY_NATIVE_WORLD_SCENE_SCHEMA
@@ -360,7 +369,7 @@ impl NativeWorldScene {
         validate_name(&self.name, "scene name")?;
         validate_name(&self.coverage, "scene coverage")?;
         self.validate_coordinate_contract()?;
-        if require_scene_instance && self.provenance.is_none() {
+        if require_scene_instance && self.provenance.is_none() && !self.native_terrain.as_ref().is_some_and(|t|t.editor_authored) {
             return Err(NativeWorldSceneError::new(
                 "authored native world scene is missing conversion provenance",
             ));
@@ -464,6 +473,7 @@ impl NativeWorldScene {
         validate_name(&terrain.name, "native terrain name")?;
         validate_name(&terrain.true_name, "native terrain trueName")?;
         validate_relative_asset_path(&terrain.path, "json")?;
+        if let Some(template)=&terrain.editor_template {validate_relative_asset_path(template,"json")?;}
         let canonical_map = terrain.path.starts_with("map/tiles/map_")
             && terrain.path.ends_with("/terrain/terrain.json");
         let canonical_world = terrain.path.starts_with("world/maps/")
@@ -476,16 +486,16 @@ impl NativeWorldScene {
             ));
         }
         validate_blake3(&terrain.blake3, &terrain.path)?;
-        if terrain.terrain_collider_path_id <= 0
+        if !terrain.editor_authored && (terrain.terrain_collider_path_id <= 0
             || terrain.terrain_game_object_path_id <= 0
-            || terrain.terrain_transform_path_id <= 0
+            || terrain.terrain_transform_path_id <= 0)
         {
             return Err(NativeWorldSceneError::new(
                 "native terrain scene hierarchy has invalid serialized-object ids",
             ));
         }
         terrain.transform.try_to_bevy("native terrain owner")?;
-        if self.schema == NATIVE_WORLD_SCENE_SCHEMA {
+        if self.schema == NATIVE_WORLD_SCENE_SCHEMA && !terrain.editor_authored {
             if terrain.terrain_data_path_id.is_none_or(|value| value <= 0)
                 || terrain.source_game_object_true_name.is_none()
                 || terrain
@@ -536,7 +546,7 @@ impl NativeWorldScene {
                 terrain.parent_transform_path_id,
                 expected_root_transform_path_id,
             )?;
-        } else if self.provenance.as_ref().is_none_or(|provenance| {
+        } else if !terrain.editor_authored && self.provenance.as_ref().is_none_or(|provenance| {
             terrain
                 .parent_root_transform_path_id
                 .is_none_or(|value| value <= 0 || value != provenance.root_transform_path_id)

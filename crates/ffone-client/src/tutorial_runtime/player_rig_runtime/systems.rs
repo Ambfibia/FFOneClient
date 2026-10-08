@@ -200,14 +200,18 @@ pub(super) fn advance_tutorial_upper_layer_playback(
 
 pub(super) fn sync_tutorial_player_weapon_visibility(
     vehicle: Res<PersonalVehiclePresentation>,
-    rigs: Query<&TutorialPlayerAnimationAdapter, With<TutorialSelectedPlayerRigActive>>,
+    rigs: Query<(&TutorialPlayerAnimationAdapter, &TutorialSelectedPlayerRig), With<TutorialSelectedPlayerRigActive>>,
+    controllers: Query<&crate::movement::LegacyPlayerController>,
     mut attachments: Query<(&TutorialPlayerWeaponAttachment, &mut Visibility)>,
 ) {
     for (attachment, mut visibility) in &mut attachments {
-        let Ok(adapter) = rigs.get(attachment.rig_root) else {
+        let Ok((adapter, rig)) = rigs.get(attachment.rig_root) else {
             continue;
         };
-        let desired = if adapter.hand_attachment_hidden || vehicle.item_id.is_some() {
+        // Traversal owns HidePistol even if equipment is refreshed mid-ride.
+        let traversal_hidden = controllers.get(rig.controller_root).is_ok_and(|controller|
+            !controller.movement_enabled || controller.launcher_active());
+        let desired = if traversal_hidden || adapter.hand_attachment_hidden || vehicle.item_id.is_some() {
             Visibility::Hidden
         } else {
             Visibility::Inherited

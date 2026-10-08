@@ -42,6 +42,7 @@ pub fn consume_world_launcher_outbox(
         &mut crate::movement::LegacyPlayerController,
     )>,
     mut cameras: Query<&mut LegacyOrbitCamera>,
+    mut actions: Query<&mut crate::avatar_action::LegacyAvatarActionState>,
     mut gameplay: ResMut<WorldGameplayIntentQueue>,
 ) {
     for effect in outbox.drain() {
@@ -65,7 +66,16 @@ pub fn consume_world_launcher_outbox(
                     Visibility::Hidden
                 };
                 for entity in &trigger.model_entities {
-                    commands.entity(*entity).insert(visibility);
+                    let mut model = commands.entity(*entity);
+                    model.insert(visibility);
+                    if visible {
+                        model.remove::<crate::world::RuntimeManagedNativeWorldVisual>();
+                    } else {
+                        // Camera residency/reveal can update the same model
+                        // after this one-shot effect. Keep its root hidden for
+                        // the whole aim mode, including all late outline passes.
+                        model.insert(crate::world::RuntimeManagedNativeWorldVisual);
+                    }
                 }
             }
             LauncherUiEffect::SetAvatarRenderersVisible(visible) => {
@@ -89,7 +99,7 @@ pub fn consume_world_launcher_outbox(
                 }
             }
             LauncherUiEffect::StartLauncher(shot) => {
-                let Ok((_entity, mut transform, mut controller)) = players.single_mut() else {
+                let Ok((entity, mut transform, mut controller)) = players.single_mut() else {
                     continue;
                 };
                 transform.translation = shot.position;
@@ -97,9 +107,18 @@ pub fn consume_world_launcher_outbox(
                     LegacyUnityHeadingDegrees::new(shot.facing_yaw_degrees).native_root_rotation();
                 controller.yaw_degrees = shot.facing_yaw_degrees;
                 if controller.launch_scripted_ballistic(shot.velocity) {
+                    if let Ok(mut state) = actions.get_mut(entity) { state.begin_launcher_pose(); }
+                    let horizontal_velocity = Vec3::new(shot.velocity.x, 0.0, shot.velocity.z);
+                    commands.entity(entity).insert(WorldLauncherTraversal {
+                        horizontal_velocity,
+                        packet_elapsed: 0.0,
+                        upward_pose: shot.velocity.y > 0.0,
+                    });
                     let request = PcLauncherRequest0104 {
                         client_time: 0,
                         position: ProtocolPosition::from_native(shot.position).raw(),
+                        // StartLauncher serializes the full shot before it
+                        // clears zipvectorTo.y for later EpUpdate packets.
                         velocity: ProtocolScaledVelocity::from_native(shot.velocity).raw(),
                         angle: LegacyUnityHeadingDegrees::new(shot.facing_yaw_degrees)
                             .to_protocol()
@@ -126,6 +145,38 @@ pub fn consume_world_launcher_outbox(
             LauncherUiEffect::SetCombatIcon(_)
             | LauncherUiEffect::SetNameVisible(_)
             | LauncherUiEffect::RequestEscapeCloseGate { .. } => {}
+        }
+    }
+}
+
+/// EpUpdate's moveType=2 branch sends LAUNCHER, including its terminal packet.
+pub fn update_world_launcher_traversals(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut players: Query<(Entity, &Transform, &mut crate::movement::LegacyPlayerController, &mut WorldLauncherTraversal)>,
+    mut gameplay: ResMut<WorldGameplayIntentQueue>,
+) {
+    for (entity, transform, mut controller, mut traversal) in &mut players {
+        let finished = !controller.launcher_active() || controller.launcher_hit_surface();
+        traversal.packet_elapsed += time.delta_secs().max(0.0);
+        if finished || traversal.packet_elapsed >= crate::movement::LEGACY_PACKET_SEND_INTERVAL {
+            let request = PcLauncherRequest0104 {
+                client_time: 0,
+                position: ProtocolPosition::from_native(transform.translation).raw(),
+                velocity: ProtocolScaledVelocity::from_native(if finished { Vec3::ZERO } else { traversal.horizontal_velocity }).raw(),
+                angle: LegacyUnityHeadingDegrees::new(controller.yaw_degrees).to_protocol().degrees(),
+                // EpUpdate clamps a rising side-hit to zero; a descending
+                // side-hit still carries fVelocityZ in its terminal packet.
+                speed: (if finished { controller.velocity.y.min(0.0) } else { controller.velocity.y } * 100.0) as i32,
+            };
+            let _ = gameplay.push(packet::P_CL2FE_REQ_PC_LAUNCHER, &request);
+            traversal.packet_elapsed = 0.0;
+        }
+        if finished {
+            if controller.launcher_active() {
+                controller.finish_scripted_traversal_with_jump();
+            }
+            commands.entity(entity).remove::<WorldLauncherTraversal>();
         }
     }
 }

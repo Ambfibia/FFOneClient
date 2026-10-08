@@ -145,6 +145,12 @@ pub(super) fn spawn_effect(
     } else {
         commands.spawn(components).id()
     };
+    // The native mission marker meshes contain the animated symbol rig, but
+    // no BillboardCamera node. Give their attachment root the camera-facing
+    // behavior while leaving the authored bobbing and spin below it intact.
+    if matches!(effect_id, 865 | 866) && parent.is_some() {
+        commands.entity(root).insert(NativeEffectBillboard { upright: true });
+    }
     runtime.bind_native_root(instance_id, root);
     if let Some(path) = plan.mesh_scene {
         let gltf = preload_cache

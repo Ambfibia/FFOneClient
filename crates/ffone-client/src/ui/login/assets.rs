@@ -53,7 +53,7 @@ impl Default for LoginUiAssetStatus {
     fn default() -> Self {
         Self::Loading {
             completed: 0,
-            total: 9,
+            total: 13,
         }
     }
 }
@@ -64,6 +64,10 @@ pub(super) fn update_login_ui_asset_status(
     mut status: ResMut<LoginUiAssetStatus>,
 ) {
     let handles = [
+        ("ui/en/option/radio-empty.png", assets.check_empty.id().untyped()),
+        ("ui/en/option/radio-checked.png", assets.check_checked.id().untyped()),
+        ("ui/en/user-equip/scroll-track.png", assets.scroll_track.id().untyped()),
+        ("ui/en/user-equip/scroll-thumb.png", assets.scroll_thumb.id().untyped()),
         (LOGIN_BACKGROUND_PATH, assets.background.id().untyped()),
         (
             LOGIN_FALLBACK_BACKGROUND_PATH,

@@ -9,8 +9,11 @@ pub(super) struct EditorState {
     pub(super) search_focused: bool,
     pub(super) strings_open: bool,
     pub(super) xdt_open: bool,
+    pub(super) missions_open: bool,
+    pub(super) world_open: Option<bool>,
     pub(super) viewer_tabs: BTreeMap<CatalogKind, (usize, String)>,
     pub(super) details_open: bool,
+    pub(super) npc_inspector: NpcInspectorTab,
     pub(super) equipment_female: bool,
     pub(super) equipment_category: Option<ffone_runtime_contracts::AvatarItemCategory>,
     pub(super) animation_page: usize,
@@ -24,6 +27,10 @@ pub(super) struct EditorState {
 }
 
 impl EditorState {
+    pub(super) fn npc_editing(&self)->bool {
+        self.kind==CatalogKind::Npc && self.npc_inspector==NpcInspectorTab::Edit
+            && !self.strings_open && !self.xdt_open && self.world_open.is_none()
+    }
     pub(super) fn new(catalog: &EditorCatalog) -> Self {
         let selected = catalog
             .entries
@@ -38,8 +45,11 @@ impl EditorState {
             search_focused: false,
             strings_open: false,
             xdt_open: false,
+            missions_open: false,
+            world_open: None,
             viewer_tabs: BTreeMap::new(),
             details_open: false,
+            npc_inspector: NpcInspectorTab::Details,
             equipment_female: false,
             equipment_category: None,
             animation_page: 0,

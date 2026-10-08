@@ -56,6 +56,7 @@ pub(super) fn spawn_world_instant_skill_effects(
     rigs: Query<&TutorialSelectedPlayerRigStatus>,
     mut pending: Local<Vec<(Entity, i32, i32, f32)>>,
     mut effects: ResMut<TutorialEffectRuntime>,
+    mut nano_commands: ResMut<TutorialNanoGameplayCommandQueue>,
 ) {
     if *state.get() != ClientState::World {
         events.0.clear();
@@ -78,6 +79,17 @@ pub(super) fn spawn_world_instant_skill_effects(
         }));
     }
     for event in npc_events.0.drain(..) {
+        for target in &event.targets {
+            if let WorldNpcSkillSourceResult0104::Corruption(result) = target.source_result
+                && result.target.entity_type == 1
+                && runtime.player_id == Some(result.target.id)
+                && result.nano_id > 0
+                && result.active_nano_slot >= 0
+                && let Ok(owner) = local.single()
+            {
+                nano_commands.play_corruption(owner, result.nano_id, result.hit_flag);
+            }
+        }
         let (skill_type, projectile_offset) = match event.kind {
             WorldNpcSkillCastKind0104::Skill { skill_type } => (skill_type, 0),
             WorldNpcSkillCastKind0104::Corruption { style } => (22, i32::from(style)),

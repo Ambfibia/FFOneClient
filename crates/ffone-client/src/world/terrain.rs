@@ -261,14 +261,21 @@ pub struct NativeTerrainSceneInstance {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct NativeWorldTerrainInstance {
+    #[serde(default)]
+    pub editor_authored: bool,
+    #[serde(default)]
+    pub editor_template: Option<String>,
     pub name: String,
     pub path: String,
     pub blake3: String,
     pub true_name: String,
     #[serde(default)]
     pub source_game_object_true_name: Option<String>,
+    #[serde(default)]
     pub terrain_collider_path_id: i64,
+    #[serde(default)]
     pub terrain_game_object_path_id: i64,
+    #[serde(default)]
     pub terrain_transform_path_id: i64,
     #[serde(default)]
     pub terrain_data_path_id: Option<i64>,

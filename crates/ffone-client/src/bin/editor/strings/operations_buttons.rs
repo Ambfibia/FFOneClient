@@ -44,7 +44,11 @@ pub(super) fn section_header(
         return;
     }
     for mut title in &mut titles {
-        let next = if state.xdt_open {
+        let next = if let Some(three_d) = state.world_open {
+            LocalizedText::new(if three_d { "ui.editor.world.3d" } else { "ui.editor.world.2d" }, if three_d { "World 3D" } else { "World 2D" })
+        } else if state.missions_open && state.xdt_open {
+            LocalizedText::new("ui.editor.missions.tab", "Missions")
+        } else if state.xdt_open {
             LocalizedText::new("ui.editor.xdt.tab", "XDT tables")
         } else if state.strings_open {
             LocalizedText::new("ui.editor.strings.tab", "Strings")
@@ -57,7 +61,7 @@ pub(super) fn section_header(
     }
     for (action, mut node) in &mut buttons {
         if *action == EditorAction::ResetCamera {
-            node.display = if state.strings_open || state.xdt_open {
+            node.display = if state.strings_open || state.xdt_open || state.world_open.is_some() {
                 Display::None
             } else {
                 Display::Flex
@@ -68,7 +72,7 @@ pub(super) fn section_header(
 
 pub(super) fn body_visibility(state: Res<EditorState>, mut bodies: Query<&mut Node, With<ModelEditorBody>>) {
     for mut node in &mut bodies {
-        let display = if state.strings_open || state.xdt_open {
+        let display = if state.strings_open || state.xdt_open || state.world_open.is_some() {
             Display::None
         } else {
             Display::Flex
@@ -169,6 +173,7 @@ pub(super) fn buttons(
                 }
                 Err(e) => editor.error(e),
             },
+            Action::ContextMode(mode) => {editor.context_mode=*mode;editor.filter_dirty=true;editor.offset=0.;editor.revision+=1;},
             Action::Discard => {
                 if !editor.discard_confirm {
                     // Load first: an unreadable file must never destroy a draft.

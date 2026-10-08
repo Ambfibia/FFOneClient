@@ -11,6 +11,7 @@ mod animation;
 mod localization;
 mod codec;
 mod pod_glow;
+mod traversal;
 
 use materials::{
     assert_material_animation_upload_contract, linear_material_curve, material_clip

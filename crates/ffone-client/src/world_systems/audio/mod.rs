@@ -545,6 +545,7 @@ fn select_retrobution_world_audio(
     players: Query<&GlobalTransform, With<LegacyPlayerController>>,
     roots: Query<&NativeWorldSceneRoot>,
     mut runtime: ResMut<WorldAudioRuntime>,
+    square_settings: Query<(&NativeWorldSceneRoot,&crate::world::NativeSquareSettings)>,
 ) {
     let delta = time.delta_secs().max(0.0);
     runtime.elapsed += f64::from(delta);
@@ -640,6 +641,14 @@ fn select_retrobution_world_audio(
     };
     let native = player.translation();
     let point = [-f64::from(native.x), f64::from(native.z)];
+    if !override_active {
+        if let Some(key)=square_settings.iter().find(|(root,_)|root.tile==crate::world::square_at(native)).map(|(_,s)|s.music.trim()).filter(|s|!s.is_empty()) {
+            if key=="stop" { runtime.music.request_stop();override_active=true; }
+            else if let Some(key)=resolve_music_request(key,&catalog,&audio) {
+                runtime.music.request(ZoneTarget{index:usize::MAX,logical_key:Some(key)});override_active=true;
+            }
+        }
+    }
     if !override_active {
         let elapsed = runtime.elapsed;
         select_channel_zone(

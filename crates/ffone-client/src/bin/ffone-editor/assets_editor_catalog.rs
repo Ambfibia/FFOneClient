@@ -54,6 +54,7 @@ pub(super) struct EditorCatalog {
     pub(super) hnpc: Option<HnpcRuntimeCatalog>,
     pub(super) npc_count: usize,
     pub(super) nano_count: usize,
+    pub(super) shiny_models: BTreeMap<i64, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +76,7 @@ impl EditorCatalog {
         }
         let content = TutorialMissionContent::open(locator).map_err(|error| error.to_string())?;
         let npc_visuals = NetworkNpcVisualCatalog0104::open(locator)?;
+        let shiny_models = npc_visuals.shiny_models().map(|(id,path)|(i64::from(id),path.to_owned())).collect();
         let base_rig = NativePlayerRigCatalog::open(locator.root())?;
         let hnpc = HnpcRuntimeCatalog::open(locator, &base_rig)?;
         let nano_portraits = GameplayNanoPortraitCatalog::open(locator)?;
@@ -238,6 +240,7 @@ impl EditorCatalog {
         }
         Ok(Self {
             hnpc: Some(hnpc),
+            shiny_models,
             entries,
             npc_count,
             nano_count,
@@ -325,6 +328,7 @@ impl EditorCatalog {
         }
         Ok(Self {
             hnpc: None,
+            shiny_models: BTreeMap::new(),
             entries,
             npc_count,
             nano_count,

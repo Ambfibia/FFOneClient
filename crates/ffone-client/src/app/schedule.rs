@@ -1269,6 +1269,13 @@ pub(super) fn run(
     )
     .add_systems(
         Update,
+        recall_world_nano_for_zipline
+            .after(process_world_trigger_uses)
+            .before(flush_world_gameplay_intents)
+            .run_if(world_nano_authority_active),
+    )
+    .add_systems(
+        Update,
         charge_world_nano_from_keyboard
             .after(sync_tutorial_action_gate)
             .before(LegacyAvatarActionSet::Resolve)
@@ -1515,8 +1522,10 @@ pub(super) fn run(
     .add_systems(
         Update,
         sync_local_avatar_presentation
+            .after(ffone_client::world_behaviour::finish_world_zipline_steps)
             .after(consume_world_gameplay_ui_outbox)
             .after(NativeWorldSet::ResolveCollision)
+            .after(ffone_client::world_behaviour::update_world_launcher_traversals)
             .before(LegacyAvatarActionSet::Locomotion)
             .before(process_tutorial_effect_runtime)
             .run_if(shared_gameplay_world_active),

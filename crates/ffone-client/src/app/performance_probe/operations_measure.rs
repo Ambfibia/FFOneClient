@@ -1,7 +1,9 @@
 use super::*;
 
 pub(in super::super) fn requested() -> bool {
-    env::var_os("FFONE_PERF_OUTPUT").is_some()
+    env::var_os("FFONE_CIVILIAN_ROUTES_PROBE_OUTPUT").is_some()
+        || env::var_os("FFONE_PERF_OUTPUT").is_some()
+        || env::var_os("FFONE_NPC_SKILL_NETWORK_PROBE_OUTPUT").is_some()
         || env::var_os("FFONE_CHARACTER_SESSION_PROBE_OUTPUT").is_some()
         || env::var_os("FFONE_NANO_ATTACK_PROBE_OUTPUT").is_some()
         || env::var_os("FFONE_CREATION_PROBE_OUTPUT").is_some()

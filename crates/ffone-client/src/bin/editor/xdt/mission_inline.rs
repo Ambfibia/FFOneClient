@@ -15,6 +15,7 @@ pub(super) fn record_label(e:&XdtEditor,t:usize,r:usize,l:&Localization,lang:&La
     format!("{} ({kind}: {number})",e.record_name(t,r))
 }
 pub(super) fn value_label(e:&XdtEditor,col:&str,value:&Value,l:&Localization,lang:&Language)->String {
+    if col==mission_visibility::FIELD&&value.is_null(){return schema::value_name(&e.tables[e.table].label,col,&Value::from(0),l,lang).unwrap_or_default();}
     if let Some(text)=schema::value_name(&e.tables[e.table].label,col,value,l,lang) {return text;}
     if let Some(values)=value.as_array() {
         let filled=values.iter().filter(|v| !authoring::neutral(v)).count();
@@ -31,6 +32,8 @@ pub(super) fn value_label(e:&XdtEditor,col:&str,value:&Value,l:&Localization,lan
 }
 
 pub(super) fn draw_field(p:&mut ChildSpawnerCommands,f:&EditorFonts,e:&XdtEditor,l:&Localization,lang:&Language,col:&str,value:&Value) {
+    let missing=Value::from(0);
+    let value=if value.is_null()&&mail_fields::is_override(col){&missing}else{value};
     let active=e.picker_field.as_deref()==Some(col);
     let focus=if e.draft.is_some(){Focus::Draft(col.into())}else{Focus::Cell(col.into())};
     p.spawn((mission_canvas::Hit::Field(col.into()),Node {width:percent(100),flex_shrink:0.,..stack()})).with_children(|p|{
@@ -57,12 +60,30 @@ fn draw_editor(p:&mut ChildSpawnerCommands,f:&EditorFonts,e:&XdtEditor,l:&Locali
     let options=schema::choices(&e.tables[e.table].label,col);
     if !options.is_empty() {
         for (code,name) in options {
-            dynamic_button(p,f,Action::Choice(col.into(),*code),format!("{} ({code})",tr(&format!("attribute.{name}"),name)),value.as_i64()==Some(*code),0.);
+            dynamic_button(p,f,Action::Choice(col.into(),*code),format!("{} ({code})",tr(&format!("attribute.{name}"),name)),value.as_i64().or_else(||(col==mission_visibility::FIELD&&value.is_null()).then_some(0))==Some(*code),0.);
         }
         action(p,f,Action::CancelEdit,"close_field","Close field");
         return;
     }
     if let Some((target,id))=e.reference_target(col) {
+        if col=="m_iComment" && e.tables[e.table].label.ends_with("/m_pNpcData") {
+            let rows=e.document.pointer(&e.tables[target].pointer).and_then(Value::as_array);
+            let mut unique=BTreeSet::new();
+            let candidates:Vec<_>=rows.into_iter().flatten().enumerate().filter_map(|(r,v)|{
+                let name=v["m_strComment2"].as_str()?.trim();
+                (!name.is_empty() && unique.insert(name.to_owned()) && name.to_lowercase().contains(&e.reference_search.to_lowercase())).then_some((r,name))
+            }).collect();
+            field(p,f,e,Focus::ReferenceSearch,36.);
+            action(p,f,Action::ClearReference(col.into()),"npc_template.voice_none","No voice");
+            p.spawn((ScrollRegion(4),Node{height:px(160),overflow:Overflow::clip(),..stack()})).with_children(|p|{
+                for (r,name) in candidates.into_iter().skip(e.reference_offset).take(4) {
+                    dynamic_button(p,f,Action::PickReference(col.into(),target,r),name.to_owned(),false,0.);
+                }
+            });
+            action(p,f,Action::Mission(mission_workspace::Command::NewVoiceType),"npc_template.new_voice","Create voice type…");
+            action(p,f,Action::CancelEdit,"close_field","Close field");
+            return;
+        }
         p.spawn(row()).with_children(|line|{
             line.spawn(Node {flex_grow:1.,min_width:px(0),..default()}).with_children(|p|field(p,f,e,Focus::ReferenceSearch,36.));
             if target!=e.table && e.array_slot.is_some() {
@@ -107,6 +128,7 @@ pub(super) fn draft(p:&mut ChildSpawnerCommands,f:&EditorFonts,e:&XdtEditor,l:&L
     let journal=e.tables[e.table].label.ends_with("/m_pJournalData");
     label(p,f,presentation::tr(l,lang,if shared&&journal{"mission.edit_journal"}else if shared{"edit_shared"}else if draft.placeholder{"new_placeholder"}else{"mission.create_use"},if shared&&journal{"Edit journal entry"}else if shared{"Edit linked text"}else if draft.placeholder{"Create placeholder"}else{"Create and use"}),19.,mission_skin::CYAN);
     label(p,f,schema::table_name(&e.tables[e.table].label,l,lang),14.,Color::srgb(0.7,0.77,0.8));
+    npc_templates::choices(p, f, e, l, lang);
     if schema::identity(&e.tables[e.table].label).is_none() {
         let id=e.workspace.quick_existing.unwrap_or(e.rows().len());
         label(p,f,format!("{}: {id}",presentation::tr(l,lang,if journal{"mission.journal_id"}else{"mission.string_id"},if journal{"Journal ID"}else{"Text ID"})),14.,mission_skin::BLUE);

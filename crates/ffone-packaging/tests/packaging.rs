@@ -229,10 +229,9 @@ fn shiny_routes_accept_logical_name_casing_but_stay_in_their_package() {
         "characters/shinies/shineni_Item/shineni_Item.glb",
         b"glTF-shiny",
     );
-    let tables: serde_json::Value = serde_json::from_slice(
-        &fs::read(temp.path().join("data/tables/xdt.json")).unwrap(),
-    )
-    .unwrap();
+    let tables: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("data/tables/xdt.json")).unwrap())
+            .unwrap();
     let validate_with_shiny_route = |glb: &str| {
         let mut tables = tables.clone();
         tables["tables"][0]["value"]["m_pCharacterModelData"]
@@ -249,6 +248,41 @@ fn shiny_routes_accept_logical_name_casing_but_stay_in_their_package() {
     validate_with_shiny_route("characters/shinies/shineni_Item/shineni_Item.glb").unwrap();
     let error = validate_with_shiny_route("characters/mobs/mob_test/mob_test.glb").unwrap_err();
     assert!(error.contains("is outside package"), "{error}");
+}
+
+#[test]
+fn reclassified_characters_keep_ids_but_follow_category_and_package() {
+    let temp = tempdir().unwrap();
+    fixture(temp.path());
+    let glb = "characters/npcs/npc_mandroid_chef/npc_mandroid_chef.glb";
+    write(temp.path(), glb, b"glTF-chef");
+    let tables: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("data/tables/xdt.json")).unwrap())
+            .unwrap();
+    let validate_route = |id: &str, category: &str, glb: &str| {
+        let mut tables = tables.clone();
+        tables["tables"][0]["value"]["m_pCharacterModelData"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": id, "category": category, "glb": glb}));
+        write(temp.path(), "data/tables/xdt.json", &pretty(&tables));
+        validate_assets(&AssetValidationOptions {
+            asset_root: temp.path().to_path_buf(),
+            full: true,
+        })
+    };
+
+    validate_route("shared/npc_mandroid_chef", "npc", glb).unwrap();
+    let error = validate_route("npc/npc_mandroid_chef", "fusion", glb).unwrap_err();
+    assert!(error.contains("outside package"), "{error}");
+    let error = validate_route("shared/npc_mandroid1", "npc", glb).unwrap_err();
+    assert!(error.contains("outside package"), "{error}");
+    let error = validate_route("shared/npc_mandroid_chef", "shared", glb).unwrap_err();
+    assert!(error.contains("unsupported character category"), "{error}");
+    for id in ["unknown/npc_mandroid_chef", "shared/..", "shared/a/b"] {
+        let error = validate_route(id, "npc", glb).unwrap_err();
+        assert!(error.contains("valid namespace/package slug"), "{error}");
+    }
 }
 
 #[test]

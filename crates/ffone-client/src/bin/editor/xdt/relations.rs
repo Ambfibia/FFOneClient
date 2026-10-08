@@ -12,7 +12,8 @@ pub(super) struct Reference {
 pub(super) fn optional_index(field: &str) -> bool {
     field == "m_iBarkerNumber" || mission_journal::is_link(field)
         || matches!(field, "m_iSTDialogBubble" | "m_iSUDialogBubble" | "m_iFDialogBubble"
-            | "m_iSTMessageTextID" | "m_iSUMessagetextID" | "m_iFMessageTextID")
+            | "m_iSTMessageTextID" | "m_iSUMessagetextID" | "m_iFMessageTextID" | "m_iMentorEmailID"
+            | "m_iSTEmailTextID" | "m_iSUEmailTextID" | "m_iFEmailTextID")
 }
 pub(super) fn rule_for(table:&str,field:&str,row:&serde_json::Map<String,Value>,slot:Option<usize>)->Option<(String,Option<&'static str>)>{
     if table.ends_with("/m_pRewardData"){
@@ -50,6 +51,7 @@ pub(super) fn rule(table: &str, field: &str) -> Option<(String, Option<&'static 
     let indexed = match (leaf, field) {
         ("m_pNpcData", "m_iIcon1") => Some("m_pNpcIconData"),
         ("m_pNpcData", "m_iNpcName") => Some("m_pNpcStringData"),
+        ("m_pNpcData", "m_iComment") => Some("m_pNpcStringData"),
         ("m_pNpcData", "m_iMesh") => Some("m_pNpcMeshData"),
         ("m_pNpcData", "m_iBarkerNumber") => Some("m_pNpcBarkerData"),
         ("m_pNanoData", "m_iIcon1") => Some("m_pNanoIconData"),
@@ -61,7 +63,7 @@ pub(super) fn rule(table: &str, field: &str) -> Option<(String, Option<&'static 
             | "m_iHCurrentObjective"
             | "m_iSTMessageTextID"
             | "m_iSUMessagetextID"
-            | "m_iFMessageTextID",
+            | "m_iFMessageTextID" | "m_iMentorEmailID" | "m_iSTEmailTextID" | "m_iSUEmailTextID" | "m_iFEmailTextID",
         ) => Some("m_pMissionStringData"),
         (
             "m_pMissionData",
@@ -89,6 +91,7 @@ pub(super) fn rule(table: &str, field: &str) -> Option<(String, Option<&'static 
                 | "m_iSTMessageSendNPC"
                 | "m_iSUMessageSendNPC"
                 | "m_iFMessageSendNPC"
+                | "m_iSTEmailSendNPC" | "m_iSUEmailSendNPC" | "m_iFEmailSendNPC"
                 | "m_iSTDialogBubbleNPCID"
                 | "m_iSUDialogBubbleNPCID"
                 | "m_iFDialogBubbleNPCID"
@@ -280,14 +283,16 @@ pub(super) fn validate_changes(base: &Value, draft: &Value) -> Result<(), String
                         && (after.len() < before.len()
                             || after.iter().any(|row| Some(row) == before.get(old_row)))
                 }) {
-                    return Err(format!(
+                    let error = format!(
                         "Changing table order shifts referenced indexes: {} #{}. Update {} #{} {} explicitly.",
                         target.label,
                         old_row + 1,
                         old_tables[reference.table].label,
                         reference.row + 1,
                         reference.field
-                    ));
+                    );
+                    let table = &new_tables[next_ref.table];
+                    return Err(schema::task_error(&draft.pointer(&table.pointer).unwrap()[next_ref.row], error));
                 }
             }
         }
@@ -314,14 +319,15 @@ pub(super) fn validate_changes(base: &Value, draft: &Value) -> Result<(), String
                 r.value,
             ))
         {
-            return Err(format!(
+            let error = format!(
                 "Broken reference: {} #{} {}={} → {}",
                 new_tables[r.table].label,
                 r.row + 1,
                 r.field,
                 r.value,
                 new_tables[r.target_table].label
-            ));
+            );
+            return Err(schema::task_error(&draft.pointer(&new_tables[r.table].pointer).unwrap()[r.row], error));
         }
     }
     Ok(())

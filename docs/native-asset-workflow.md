@@ -21,9 +21,15 @@ references, never machine paths, build aliases, Unity IDs or conversion commands
 
 Preserve domain ownership and GLB-relative material/mip URIs. Do not restore a flat
 `models/` or `textures/` dumping ground or make per-model copies of shared payloads.
+Character models use `npcs`, `mobs`, `fusions`, `nanos` and `shinies`; shared
+textures may remain under `characters/shared`. Route `category` owns the physical
+directory, while accepted route IDs keep their original namespace and package slug.
 `_runtime/audio.json` and `_runtime/characters.json` are retired, not runtime inputs.
 Existing other catalogs, hashes and compatibility fields remain until their consumers
 migrate; do not drop validation or regenerate the combined TableData from one legacy XDT.
+`map/catalog.json` is a reference registry: IDs and guarded file references, without
+source-build evidence, repeated object metadata or summary counts. Its v1 reader contract
+and all path/byte/BLAKE3 bindings remain intact; see [map assets](map-assets.md).
 
 Commit editable JSON/GLB/PNG/OGG/TTF/OTF/WGSL and explicit terrain height/layer sources.
 Retain active native BIN contracts where required. Optimization/release output is
@@ -38,6 +44,17 @@ The `_ffone` extension owns the `ffone.xdt.v1` schema, table identities, native
 routes and other client metadata. Preserve it when editing or distributing the
 shared XDT. Client loaders reconstruct a named table view in memory; this is not
 a second authored file. Do not overwrite client content with an older server copy.
+
+Mission destinations in `data/missions/client-npc-waypoints.json` use
+`ffone.client-npc-waypoint-catalog.v2`: `schema` and ordered `rows`, each with
+`npcType` and `clientPosition` in the existing client-world units. Row indices and
+counts are derived; duplicate types retain first-match order. The loader still
+validates v1 provenance/counts/indices when reading older files. The mission editor
+publishes v2 without legacy provenance and refreshes appended destinations from
+the selected server's `NPCs.json`, preserving the accepted baseline prefix.
+Existing authored positions remain intact when the selected server has no matching
+placement; they do not block unrelated edits. Newly assigned mission destinations
+still require a matching placement before Rewrite publishes gameplay files.
 
 Keep explicit network IDs, accepted variants/remaps and approved replacement fonts.
 Duplicate semantic/network identities fail; replacement must be explicit and preserve

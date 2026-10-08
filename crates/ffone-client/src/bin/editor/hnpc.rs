@@ -11,6 +11,8 @@ use std::io::Write;
 mod tests;
 #[path = "hnpc_view.rs"]
 mod view;
+#[path="hnpc_wardrobe.rs"]
+mod wardrobe;
 
 pub(super) struct HnpcEditorPlugin;
 impl Plugin for HnpcEditorPlugin {
@@ -116,8 +118,7 @@ impl HnpcEditor {
                 continue;
             };
             let Some(look) = original
-                .appearance(index as usize)
-                .and_then(|a| a.look.as_ref())
+                .authored_look(index as usize)
             else {
                 continue;
             };
@@ -154,6 +155,7 @@ impl HnpcEditor {
                 });
             }
         }
+        self.add_player_wardrobe()?;
         self.original = Some(original.clone());
         self.undo.clear();
         self.redo.clear();
@@ -257,6 +259,8 @@ impl HnpcEditor {
             }
         }
         look.height_selector = self.draft["height"].as_i64().ok_or("Missing height")? as i8;
+        let hat_type = self.draft["parts"].as_array().into_iter().flatten().find(|p| p["kind"] == "hat").and_then(|p| p["equipType"].as_u64()).map(|n| n as u8);
+        original.apply_equipment_visibility(&mut look, hat_type)?;
         look.body_selector = self.draft["shape"].as_i64().ok_or("Missing shape")? as i8;
         for (field, palette, color) in [
             ("skinColor", "skin", &mut look.skin_color),

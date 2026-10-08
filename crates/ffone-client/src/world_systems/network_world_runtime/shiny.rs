@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct ShinyVisualDefinition {
     name: String,
-    glb: String,
+    pub(super) glb: String,
     pickup_effect: i32,
 }
 

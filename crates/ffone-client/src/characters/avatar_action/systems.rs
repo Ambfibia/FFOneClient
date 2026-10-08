@@ -131,6 +131,8 @@ pub(super) fn update_legacy_avatar_locomotion(
             .copied()
             .unwrap_or_default()
             .authoritative_locomotion_override()
+            .or_else(|| presentation.is_some_and(|p| p.traversal == LegacyAvatarTraversalPresentation::LauncherUnposed)
+                .then_some(state.locomotion))
         {
             // `AvatarSlope`, `AvatarZipline`, and `SetInvenMotion` own the
             // full-body clip while their source fact remains active. They must
@@ -141,7 +143,7 @@ pub(super) fn update_legacy_avatar_locomotion(
                 || matches!(state.upper_action, Some(LegacyVisualClip::AttackUpper(_)));
             state.base_action = None;
             state.weapon_change_visual_active = false;
-            if matches!(next, LegacyLocomotionState::RopeDown | LegacyLocomotionState::RopeDrop
+            if controller.launcher_active() || matches!(next, LegacyLocomotionState::Launcher | LegacyLocomotionState::RopeDown | LegacyLocomotionState::RopeDrop
                 | LegacyLocomotionState::RopeLeft | LegacyLocomotionState::RopeRight
                 | LegacyLocomotionState::RopeStand1 | LegacyLocomotionState::RopeStand2
                 | LegacyLocomotionState::RopeTurn | LegacyLocomotionState::RopeUp)

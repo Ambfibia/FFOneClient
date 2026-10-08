@@ -34,9 +34,20 @@ assets/game/
       terrain/...
 ```
 
-`catalog.json` is the map entry point. Its `resourceSets`, `geometry`, `objects` and `tiles` arrays
-describe the complete reference graph. There is no physical tutorial/world split, no `Prefab`
-directory and no global map-model texture dump.
+`catalog.json` is the map entry point and a minimal `ffone.map-catalog.v1` reference registry.
+`resourceSets` and `objects` retain only `id` and their guarded `definition`; `geometry` retains
+`id`, its guarded `model` and nonempty accepted `aliases`. `tiles` retain `tileId`, `manifest`
+and `objects` references.
+`compositeObjects` retain their distinct IDs, definitions and guarded files; `sharedFiles`
+retains shared guarded payloads. Every file reference keeps `path`, `bytes` and `blake3`.
+Array order and accepted IDs are preserved. Counts, category summaries, source-build metadata,
+reconstruction evidence and historical geometry transforms are not catalog inputs.
+
+The client follows tile manifests to scenes, terrain, behaviours and placements. Packaging
+validates the same reference registry and object-set definitions. Names, categories, object
+parts and resource-set membership remain owned by the leaf definitions; tile aliases remain
+in `tile.json`. There is no physical tutorial/world split, no `Prefab` directory and no global
+map-model texture dump.
 
 Each logical map object remains one indivisible package: its `object.json` owns every visual and
 collision part, so collision cannot be separated from the reusable object accidentally. Objects
@@ -49,7 +60,7 @@ Physical package names are readable and never contain content-hash suffixes. The
 package owns the plain `<object>` route. If primary evidence proves that several different objects
 have the same legacy display name, additional packages use sibling routes
 `<object>_variant_0002`, `<object>_variant_0003`, and so on. Exact content identity and source
-ownership remain in `object.json` and `catalog.json`, not in the directory name.
+ownership remain in the object/set definitions and catalog references, not in the directory name.
 
 Terrain heightmaps, weights, lightmaps, gameplay attributes, details and environment remain owned
 by their tile. Reusable terrain layer textures are content-addressed below `map/shared/terrain` and

@@ -524,6 +524,8 @@ pub(crate) fn restore_tab(root: &Path, state: &mut EditorState, catalog: &Editor
     let Some(tab) = read_tab(root) else { return };
     state.strings_open = tab == "strings";
     state.xdt_open = tab == "xdt";
+    state.missions_open = tab == "missions";
+    state.world_open = match tab.as_str() { "world2d" => Some(false), "world3d" => Some(true), _ => None };
     let kind = match tab.as_str() {
         "nano" => CatalogKind::Nano,
         "equipment" => CatalogKind::Equipment,
@@ -540,7 +542,11 @@ pub(super) fn remember_tab(
     editor: Res<StringEditor>,
     mut last: Local<String>,
 ) {
-    let tab = if state.xdt_open {
+    let tab = if let Some(three_d) = state.world_open {
+        if three_d { "world3d" } else { "world2d" }
+    } else if state.missions_open && state.xdt_open {
+        "missions"
+    } else if state.xdt_open {
         "xdt"
     } else if state.strings_open {
         "strings"

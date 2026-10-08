@@ -3,7 +3,7 @@ use super::*;
 impl TutorialPlayerClip {
     pub const fn is_vehicle(self) -> bool { matches!(self, Self::BoardStand1 | Self::BoardRun | Self::BoardRunBack | Self::BoardJumpStart | Self::BoardJump | Self::BoardJumpEnd | Self::BoardJumpLandRun | Self::ScooterStand1 | Self::ScooterRun | Self::ScooterRunBack | Self::ScooterJumpStart | Self::ScooterJump | Self::ScooterJumpEnd | Self::ScooterJumpLandRun) }
 
-    pub const ALL: [Self; 141] = [
+    pub const ALL: [Self; 142] = [
         Self::WoundUpper,
         Self::Stun,
         Self::StickDash,
@@ -26,6 +26,7 @@ impl TutorialPlayerClip {
         Self::Death,
         Self::Slide,
         Self::RopeDown,
+        Self::Launcher,
         Self::RopeDrop,
         Self::RopeLeft,
         Self::RopeRight,
@@ -172,6 +173,7 @@ impl TutorialPlayerClip {
             Self::Death => "death",
             Self::Slide => "slide",
             Self::RopeDown => "ropedown",
+            Self::Launcher => "luncher",
             Self::RopeDrop => "ropedrop",
             Self::RopeLeft => "ropeleft",
             Self::RopeRight => "roperight",
@@ -531,6 +533,7 @@ impl TutorialPlayerClip {
             (_, Self::FfrDanceTellMe) => 648,
             (_, Self::FfrEmoteCatPose) => 639,
             (_, Self::FfrEmoteIdolPose) => 623,
+            (_, Self::Launcher) => 0,
         }
     }
 
@@ -600,6 +603,7 @@ impl TutorialPlayerClip {
             | Self::Standup
             | Self::Die
             | Self::JumpStart
+            | Self::Launcher
             | Self::JumpEnd
             | Self::JumpLandRun
             | Self::StickJumpStart

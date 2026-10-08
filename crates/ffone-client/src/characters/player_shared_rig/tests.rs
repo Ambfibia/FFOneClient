@@ -36,6 +36,29 @@ fn preview_asset_cache_retains_strong_handles_across_scene_transitions() {
 }
 
 #[test]
+fn bug019_civilian_walk_is_available_on_both_shared_rigs() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
+    let catalog = NativePlayerRigCatalog::open(&root).unwrap();
+    for gender in [PlayerRigGender::Male, PlayerRigGender::Female] {
+        let rig = catalog.gender(gender).unwrap();
+        let clips: Vec<_> = rig.clips.iter().filter(|clip| clip.name == "walk").collect();
+        assert_eq!(clips.len(), 1);
+        let clip = clips[0];
+        assert_eq!(clip.playback, "loop");
+        assert!(clip.channel_count > 0);
+        assert!(f64::from_bits(clip.duration_seconds_bits) > 0.0);
+        let bytes = std::fs::read(root.join(&rig.skeleton_glb)).unwrap();
+        let gltf = gltf::Gltf::from_slice(&bytes).unwrap();
+        let animation = gltf.animations().nth(clip.gltf_animation_index as usize).unwrap();
+        assert_eq!(animation.name(), Some("walk"));
+        assert_eq!(animation.channels().count(), clip.channel_count as usize);
+        // The shared actor clip must coexist with normal player locomotion.
+        assert!(rig.clips.iter().any(|clip| clip.name == "run"));
+        assert!(rig.clips.iter().any(|clip| clip.name == "stand1"));
+    }
+}
+
+#[test]
 fn production_catalog_verifies_both_native_shared_rigs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/game");
     let catalog = NativePlayerRigCatalog::open(root).unwrap();

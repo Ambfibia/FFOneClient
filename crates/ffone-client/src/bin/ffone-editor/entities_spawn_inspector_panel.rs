@@ -20,6 +20,11 @@ pub(super) fn spawn_inspector_panel(parent: &mut ChildSpawnerCommands, fonts: &E
             spawn_equipment_controls(panel, fonts);
             spawn_action_button(panel, fonts, EditorAction::IconGenerator,
                 "ui.editor.icons.open", "Icon generator · 128 × 128", 300.0);
+            panel.spawn((NpcInspectorTabs,Node{width:percent(100),column_gap:px(4),flex_shrink:0.,..default()})).with_children(|p|{
+                for (tab,key,en) in [(NpcInspectorTab::Details,"ui.editor.details","Details"),(NpcInspectorTab::Animations,"ui.editor.npc.animations","Animations"),(NpcInspectorTab::Edit,"ui.editor.npc.edit","Edit")] {
+                    spawn_action_button(p,fonts,EditorAction::NpcInspector(tab),key,en,97.);
+                }
+            });
             spawn_action_button(
                 panel,
                 fonts,
@@ -54,6 +59,7 @@ pub(super) fn spawn_inspector_panel(parent: &mut ChildSpawnerCommands, fonts: &E
                     "ui.editor.inspector.textures",
                     "Main texture: {main}\nSub texture: {sub}",
                 ),
+                (DynamicTextRole::InspectorPlacements, "ui.editor.npc.placements", "{placements}"),
             ] {
                 panel.spawn((
                     editor_text(
@@ -84,6 +90,7 @@ pub(super) fn spawn_inspector_panel(parent: &mut ChildSpawnerCommands, fonts: &E
                 },
                 BackgroundColor(Color::srgba(0.22, 0.7, 0.8, 0.32)),
             ));
+            panel.spawn((NpcEditSection,Node{width:percent(100),flex_shrink:0.,row_gap:px(6),flex_direction:FlexDirection::Column,..default()}));
             panel
                 .spawn((
                     Node {
@@ -186,7 +193,7 @@ pub(super) fn spawn_inspector_panel(parent: &mut ChildSpawnerCommands, fonts: &E
                     panel.spawn(editor_text(
                         fonts,
                         "ui.editor.help",
-                        "↑/↓: select · Drag: orbit · Wheel: zoom · D/T: pose · ←/→: clip · F9: language",
+                        "↑/↓: select · LMB: orbit · RMB/MMB: pan · Wheel: zoom · D/T: pose · ←/→: clip · F9: language",
                         11.0,
                         Color::srgb(0.4, 0.66, 0.73),
                         false,

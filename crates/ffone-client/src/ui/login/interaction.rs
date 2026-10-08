@@ -49,19 +49,24 @@ pub(super) fn sliced_button_image(handle: Handle<Image>) -> ImageNode {
 }
 
 pub(super) fn handle_login_keyboard(
+    browser: Res<LoginBrowser>,
     keys: Option<MessageReader<KeyboardInput>>,
     buttons: Option<Res<ButtonInput<KeyCode>>>,
     option_ui: Res<OptionUiModel>,
     mut model: ResMut<LoginUiModel>,
     mut outbox: ResMut<LoginUiOutbox>,
 ) {
-    if option_ui.visible || !model.accepts_manual_input() {
+    if browser.editing_server || option_ui.visible || !model.accepts_manual_input() {
         return;
     }
     let Some(mut keys) = keys else {
         return;
     };
     for key in keys.read() {
+        if model.saved_account.is_some() {
+            if key.state == ButtonState::Pressed && matches!(key.key_code, KeyCode::Enter | KeyCode::NumpadEnter) { queue_login(&mut model, &mut outbox); }
+            continue;
+        }
         if key.state != ButtonState::Pressed {
             continue;
         }
@@ -94,7 +99,7 @@ pub(super) fn handle_login_edit_pointer(
             &Text,
             Has<LoginUsernameText>,
         ),
-        With<EditVisual>,
+        Or<(With<LoginUsernameText>, With<LoginPasswordText>)>,
     >,
     option_ui: Res<OptionUiModel>,
     mut model: ResMut<LoginUiModel>,
@@ -158,6 +163,7 @@ pub(super) fn handle_login_interactions(
     mut model: ResMut<LoginUiModel>,
     mut outbox: ResMut<LoginUiOutbox>,
     mut effects: ResMut<LoginUiEffectOutbox>,
+    mut browser: ResMut<LoginBrowser>,
     option_ui: Res<OptionUiModel>,
     username: Query<
         &Interaction,
@@ -222,12 +228,14 @@ pub(super) fn handle_login_interactions(
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
     {
+        browser.editing_server = false;
         model.focused = LoginField::Username;
     }
     if password
         .iter()
         .any(|interaction| *interaction == Interaction::Pressed)
     {
+        browser.editing_server = false;
         model.focused = LoginField::Password;
     }
     if submit

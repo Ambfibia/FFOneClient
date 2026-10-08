@@ -162,7 +162,7 @@ use types::{
     NetworkNpcHighAnimations0104, NetworkNpcAdditivePair0104
 };
 use animation_sync_network_hnpc_animation::{
-    NetworkNpcAnimationEffectEvent0104, parse_network_npc_animation_document,
+    NetworkNpcAnimationEffectEvent0104,
     parse_network_npc_animation_effect_events, parse_network_npc_animation_end_events,
     NetworkPcAnimationRevision0104, NetworkHnpcAnimationRevision0104,
     sync_network_pc_animation_0104, block_network_pc_rig, NetworkHnpcAnimationState0104,
@@ -170,6 +170,7 @@ use animation_sync_network_hnpc_animation::{
     NetworkNpcAnimationApplied0104, NetworkNpcPreparedAnimationGraph0104,
     NetworkNpcAnimationAssets0104
 };
+pub(crate) use animation_sync_network_hnpc_animation::parse_network_npc_animation_document;
 #[cfg(test)]
 use animation_sync_network_hnpc_animation::{
     network_pc_animation_clip, hnpc_idle_clip, network_hnpc_animation_clip

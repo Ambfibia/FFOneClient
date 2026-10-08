@@ -194,18 +194,21 @@ impl EmailProductionCatalog0104 {
                 }
             }
             let start_message_type = combi_table_i32_0104(row, "m_iSTMessageType", &row_context)?;
-            let has_start_mail = matches!(start_message_type, 4 | 6);
+            let has_start_mail = start_message_type & 4 != 0;
+            let separate = start_message_type & 6 == 6 && row.get("m_iSTEmailTextID").and_then(serde_json::Value::as_i64).is_some_and(|id|id>0);
+            let start_string_id = combi_table_i32_0104(row, if separate {"m_iSTEmailTextID"} else {"m_iSTMessageTextID"}, &row_context)?;
+            let start_sender = combi_table_i32_0104(row, if separate && row.get("m_iSTEmailSendNPC").and_then(serde_json::Value::as_i64).is_some_and(|id|id>0) {"m_iSTEmailSendNPC"} else {"m_iSTMessageSendNPC"}, &row_context)?;
             if !has_start_mail && mentor_copy.iter().all(Option::is_none) {
                 continue;
             }
             guide_rows.push(EmailGuideTableRow0104 {
                 task_id,
                 start_message_type,
-                start_sender: combi_table_i32_0104(row, "m_iSTMessageSendNPC", &row_context)?,
-                start_string_id: combi_table_i32_0104(row, "m_iSTMessageTextID", &row_context)?,
+                start_sender,
+                start_string_id,
                 start_copy: if has_start_mail {
                     resolve_mission_string(
-                        combi_table_i32_0104(row, "m_iSTMessageTextID", &row_context)?,
+                        start_string_id,
                         &row_context,
                     )?
                 } else {
@@ -285,7 +288,7 @@ pub(super) fn email_guide_messages_0104(
     for mode in [1, 2] {
         for row in &catalog.guide_rows {
             let (sender_npc_id, copy, content_string_id) = if mode == 1 {
-                if !active.contains(&row.task_id) || !matches!(row.start_message_type, 4 | 6) {
+                if !active.contains(&row.task_id) || row.start_message_type & 4 == 0 {
                     continue;
                 }
                 (row.start_sender, &row.start_copy, row.start_string_id)

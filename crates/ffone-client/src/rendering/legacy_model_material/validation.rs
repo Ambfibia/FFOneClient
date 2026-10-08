@@ -293,6 +293,23 @@ pub(super) fn is_shared_domain_texture_uri(uri: &str) -> bool {
                 .bytes()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
     };
+    // Item packages retain accepted locations while sharing verified atlases
+    // and their complete mip chains. AssetPath resolves them inside the root.
+    let item_parts = match parts.as_slice() {
+        ["back" | "glasses" | "hat" | "shirt" | "pants" | "shoes" | "vehicle" | "weapon", rest @ ..] => rest,
+        _ => parts.as_slice(),
+    };
+    if let [owner, "models", model, textures, _, ..] = item_parts {
+        if owner == model && semantic_owner(owner) && *textures == format!("{model}.textures") {
+            return true;
+        }
+    }
+    if let [owner, "textures", _, ..] = item_parts {
+        if semantic_owner(owner) && ["back_", "face_", "hat_", "helmet_", "m_", "f_", "shirt_", "pants_", "shoes_", "vehicle_", "weapon_"]
+            .iter().any(|prefix| owner.starts_with(prefix)) {
+            return true;
+        }
+    }
     match parts.as_slice() {
         ["effects", "shared", "textures", _, ..]
         | ["characters", "shared", "textures", _, ..]
@@ -310,6 +327,17 @@ pub(super) fn is_shared_domain_texture_uri(uri: &str) -> bool {
             ..,
         ]
         | [owner, "textures", "shared", _, ..] => semantic_owner(owner),
+        // A separate character variant may reuse its sibling's authored
+        // texture/mip package, without duplicating those payloads.
+        [owner, texture_dir, _, ..]
+            if semantic_owner(owner)
+                && ["npc_", "mob_", "fusion_", "nano_"]
+                    .iter()
+                    .any(|prefix| owner.starts_with(prefix))
+                && *texture_dir == format!("{owner}.textures") =>
+        {
+            true
+        }
         _ => false,
     }
 }

@@ -177,9 +177,7 @@ impl XdtEditor {
         });
         if !duplicate {
             if self.tables[self.table].label.ends_with("/m_pJournalData") {
-                for field in mission_journal::TEXT_FIELDS {
-                    self.draft.as_mut().unwrap().value[*field] = Value::from(0);
-                }
+                self.draft.as_mut().unwrap().value["m_iDetailedTaskDesc"] = Value::from(0);
             }
             if self.tables[self.table]
                 .label
@@ -364,8 +362,8 @@ impl XdtEditor {
             let owner = next.pointer_mut(&self.tables[origin.table].pointer).and_then(|v| v.get_mut(origin.row)).ok_or("Missing owner")?;
             if let Some(slot) = origin.slot { *owner.get_mut(&origin.field).and_then(|v| v.get_mut(slot)).ok_or("Missing list element")? = link.clone(); }
             else { owner[&origin.field] = link.clone(); }
+            mission_events::enable_nanocom(owner, &origin.field);
         }
-        let aliases=self.quick_text_aliases(&value,row);
         let translations=self.workspace.quick_text.as_ref().map(|text|{
             if text.values.iter().all(|v|v.is_empty()) {
                 let fallback=draft.name.as_ref().map(|n|n.text.clone()).or_else(||value["m_pstrNameString"].as_str().map(str::to_owned)).unwrap_or_default();
@@ -373,6 +371,7 @@ impl XdtEditor {
             }else{text.values.clone()}
         });
         self.commit_document(next)?;
+        let aliases=self.quick_text_aliases(&value,row);
         if let Some(translations)=translations{self.attach_text_history(aliases,translations)?;}
         if self.workspace.quick.is_some() { self.finish_creation(Some(link)); }
         else {

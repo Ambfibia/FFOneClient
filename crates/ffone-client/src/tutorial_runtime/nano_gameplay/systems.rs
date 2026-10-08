@@ -59,6 +59,21 @@ pub fn apply_tutorial_nano_gameplay_commands(world: &mut World) {
             TutorialNanoGameplayCommand::PlayWorldSkill { owner } => {
                 play_world_nano_skill(world, owner)
             }
+            TutorialNanoGameplayCommand::PlayCorruption { owner, nano_id, hit_flag } => {
+                let mut state = world.resource_mut::<TutorialNanoGameplayState>();
+                if state.owner == Some(owner)
+                    && state.loadout.is_some_and(|loadout| loadout.nano_id == nano_id)
+                    && state.world_presentation.is_some()
+                    && (state.is_active() || matches!(state.status, TutorialNanoGameplayStatus::Loading))
+                {
+                    match hit_flag {
+                        4 => state.request_clip("win"),
+                        8 => state.request_clip("tie"),
+                        16 => state.request_clip("lose"),
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 }

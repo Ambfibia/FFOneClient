@@ -627,26 +627,28 @@ fn tutorial_npc_mission_symbols_follow_retrobution_priority_and_effect_ids() {
         interacting: false,
         invulnerable: false,
     };
+    let content=runtime_test_mission_content();
+    let surface=ffone_client::tutorial_mission_content::MissionMarkerSurface::Overhead;
     let mut mission = TutorialMissionRuntime::default();
-    let new = tutorial_npc_mission_symbol(&actor(2671), &mission).unwrap();
+    let new = tutorial_npc_mission_symbol(&actor(2671), &mission,&content,surface).unwrap();
     assert_eq!((new, new.effect_id()), (MinimapMissionSymbol::New, 866));
 
     mission.active_tasks.push(2248);
-    assert_eq!(tutorial_npc_mission_symbol(&actor(2671), &mission), None);
+    assert_eq!(tutorial_npc_mission_symbol(&actor(2671), &mission,&content,surface), None);
     mission.active_tasks = vec![2249];
-    let advance = tutorial_npc_mission_symbol(&actor(2671), &mission).unwrap();
+    let advance = tutorial_npc_mission_symbol(&actor(2671), &mission,&content,surface).unwrap();
     assert_eq!(
         (advance, advance.effect_id()),
         (MinimapMissionSymbol::Advance, 865)
     );
     mission.active_tasks = vec![2250];
     assert_eq!(
-        tutorial_npc_mission_symbol(&actor(2672), &mission),
+        tutorial_npc_mission_symbol(&actor(2672), &mission,&content,surface),
         Some(MinimapMissionSymbol::Advance)
     );
     mission.active_tasks = vec![2253];
     assert_eq!(
-        tutorial_npc_mission_symbol(&actor(2673), &mission),
+        tutorial_npc_mission_symbol(&actor(2673), &mission,&content,surface),
         Some(MinimapMissionSymbol::Advance)
     );
 }

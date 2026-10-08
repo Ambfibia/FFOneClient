@@ -5,6 +5,8 @@ pub struct LoginUiModel {
     pub visible: bool,
     pub username: String,
     pub password: String,
+    /// Explicit selection permits using the stored credential without a password field.
+    pub saved_account: Option<String>,
     pub focused: LoginField,
     pub username_edit: TextEdit,
     pub password_edit: TextEdit,
@@ -21,6 +23,7 @@ impl Default for LoginUiModel {
             visible: false,
             username: String::new(),
             password: String::new(),
+            saved_account: None,
             focused: LoginField::Username,
             username_edit: TextEdit::default(),
             password_edit: TextEdit::default(),

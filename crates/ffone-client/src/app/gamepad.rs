@@ -1,5 +1,5 @@
 //! Translate Bevy's semantic gamepad controls into the saved legacy pad column.
-use bevy::input::gamepad::{Gamepad, GamepadAxis, GamepadButton};
+use bevy::input::gamepad::{Gamepad, GamepadAxis, GamepadButton, GamepadConnection, GamepadConnectionEvent};
 use bevy::prelude::*;
 use ffone_client::option_ui::{
     InputSettings, LegacyAxisDirection, LegacyInputBinding, LegacyOptionAction, LegacyPadProfile,
@@ -98,16 +98,30 @@ impl GamepadActionState {
 pub(super) fn sample_gamepad_actions(
     options: Res<super::OptionProductionRuntime>,
     gamepads: Query<(Entity, &Gamepad)>,
+    mut connections: MessageReader<GamepadConnectionEvent>,
+    mut reconnecting: Local<Option<Entity>>,
     mut state: ResMut<GamepadActionState>,
     mut players: Query<&mut ffone_client::movement::LegacyPlayerController, With<super::LocalPlayer>>,
 ) {
-    let active = state
-        .active
+    let preferred = state.active.or(reconnecting.take());
+    // Bevy preserves the entity on reconnect. A remove/add pair processed in
+    // one frame leaves a Gamepad in this query, so the messages own the loss edge.
+    let disconnected = connections.read().fold(false, |lost, event| {
+        lost || Some(event.gamepad) == preferred
+            && matches!(event.connection, GamepadConnection::Disconnected)
+    });
+    let active = preferred
         .and_then(|entity| gamepads.get(entity).ok())
         .or_else(|| gamepads.iter().min_by_key(|(entity, _)| entity.index()));
-    let removed = state.active.is_some() && state.active != active.map(|(entity, _)| entity);
-    state.sample(&options.input, active);
+    let removed = disconnected
+        || state.active.is_some() && state.active != active.map(|(entity, _)| entity);
+    // Publish a neutral frame even if it has already reconnected. This clears
+    // UI holds and cancels cannon charging without manufacturing a fire release.
+    state.sample(&options.input, if removed { None } else { active });
     if removed {
+        // Retain ownership across the neutral frame when the same entity is
+        // already back, instead of silently switching to another connected pad.
+        *reconnecting = active.map(|(entity, _)| entity);
         for mut player in &mut players {
             player.set_auto_run(false);
         }
@@ -268,6 +282,7 @@ mod tests {
         let mut app = App::new();
         app.init_resource::<OptionProductionRuntime>()
             .init_resource::<GamepadActionState>()
+            .add_message::<GamepadConnectionEvent>()
             .add_systems(Update, sample_gamepad_actions);
         let entity = app.world_mut().spawn(Gamepad::default()).id();
         {
@@ -312,6 +327,65 @@ mod hotplug_regressions {
     use crate::app::OptionProductionRuntime;
     use bevy::input::gamepad::{GamepadConnection, GamepadConnectionEvent};
     use bevy::input::{InputPlugin, InputSystems};
+
+    #[test]
+    fn disconnect_and_reconnect_in_one_frame_stops_auto_run() {
+        let mut app = App::new();
+        app.add_plugins(InputPlugin)
+            .init_resource::<OptionProductionRuntime>()
+            .init_resource::<GamepadActionState>()
+            .add_systems(PreUpdate, sample_gamepad_actions.after(InputSystems));
+        let older = app.world_mut().spawn_empty().id();
+        let device = app.world_mut().spawn_empty().id();
+        let player = app.world_mut().spawn((super::super::LocalPlayer,
+            ffone_client::movement::LegacyPlayerController::from_baseline_table())).id();
+        let connect = || GamepadConnectionEvent::new(device, GamepadConnection::Connected {
+            name: "Regression pad".into(), vendor_id: None, product_id: None,
+        });
+        app.world_mut().write_message(connect());
+        app.update();
+        app.world_mut().entity_mut(older).insert(Gamepad::default());
+        for _ in 0..5 {
+            app.world_mut().get_mut::<Gamepad>(device).unwrap().analog_mut()
+                .set(GamepadAxis::LeftStickY, 1.0);
+            app.update();
+            app.world_mut().get_mut::<ffone_client::movement::LegacyPlayerController>(player)
+                .unwrap().set_auto_run(true);
+            app.world_mut().write_message(GamepadConnectionEvent::new(device, GamepadConnection::Disconnected));
+            app.world_mut().write_message(connect());
+            app.update();
+            assert!(!app.world().get::<ffone_client::movement::LegacyPlayerController>(player)
+                .unwrap().is_auto_running(), "same-frame reconnect must stop auto-run");
+            let state = app.world().resource::<GamepadActionState>();
+            assert!(!state.connected(), "publish a neutral disconnect frame");
+            assert_eq!(state.value(LegacyOptionAction::Up), 0.0);
+            app.world_mut().get_mut::<Gamepad>(device).unwrap().digital_mut().press(GamepadButton::West);
+            app.update();
+            assert!(app.world().resource::<GamepadActionState>().connected());
+            assert!(app.world().resource::<GamepadActionState>().just_pressed(LegacyOptionAction::Nano1));
+        }
+    }
+
+    #[test]
+    fn disconnecting_an_inactive_pad_does_not_stop_active_auto_run() {
+        let mut app = App::new();
+        app.add_plugins(InputPlugin)
+            .init_resource::<OptionProductionRuntime>()
+            .init_resource::<GamepadActionState>()
+            .add_systems(PreUpdate, sample_gamepad_actions.after(InputSystems));
+        let active = app.world_mut().spawn(Gamepad::default()).id();
+        let inactive = app.world_mut().spawn(Gamepad::default()).id();
+        let player = app.world_mut().spawn((super::super::LocalPlayer,
+            ffone_client::movement::LegacyPlayerController::from_baseline_table())).id();
+        app.update();
+        app.world_mut().get_mut::<ffone_client::movement::LegacyPlayerController>(player)
+            .unwrap().set_auto_run(true);
+        app.world_mut().write_message(GamepadConnectionEvent::new(inactive, GamepadConnection::Disconnected));
+        app.update();
+        assert!(app.world().get::<ffone_client::movement::LegacyPlayerController>(player)
+            .unwrap().is_auto_running());
+        assert_eq!(app.world().resource::<GamepadActionState>().active, Some(active));
+    }
 
     #[test]
     fn connection_messages_release_and_reconnect_same_device_repeatedly() {

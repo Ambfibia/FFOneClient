@@ -27,6 +27,20 @@ impl fmt::Debug for LoginRequest {
 }
 
 impl LoginRequest {
+    /// API credentials use the byte cookie fields, never the 33-unit password field.
+    pub fn cookie_login(id: &str, cookie: &str, a: i32, b: i32, c: i32) -> Result<Self, PayloadError> {
+        for (field, value, maximum) in [("cookie username bytes", id, 63), ("cookie token bytes", cookie, 254)] {
+            if value.is_empty() || value.len() > maximum || value.as_bytes().contains(&0) {
+                return Err(PayloadError::ValueOutOfRange { field, value: value.len() as i32, minimum: 1, maximum: maximum as i32 });
+            }
+        }
+        let mut request = Self::password_login("", "", a, b, c)?;
+        request.login_type = 2;
+        request.cookie_teg_id[..id.len()].copy_from_slice(id.as_bytes());
+        request.cookie_auth_id[..cookie.len()].copy_from_slice(cookie.as_bytes());
+        Ok(request)
+    }
+
     pub fn password_login(
         id: &str,
         password: &str,
@@ -125,5 +139,23 @@ impl WirePayload for PcEnterRequest {
             temporary_value: read_i32(bytes, 68),
             enter_serial_key: read_i64(bytes, 72),
         })
+    }
+}
+
+#[cfg(test)]
+mod cookie_login_tests {
+    use super::*;
+    #[test]
+    fn cookie_uses_full_byte_field_and_preserves_wire_layout() {
+        let token = "a".repeat(64);
+        let request = LoginRequest::cookie_login("player", &token, 1, 0, 44).unwrap();
+        assert_eq!(request.login_type, 2);
+        assert_eq!(&request.cookie_auth_id[..64], token.as_bytes());
+        assert_eq!(request.cookie_auth_id[64], 0);
+        assert_eq!(request.encode().len(), 468);
+        assert_eq!(LoginRequest::decode(&request.encode()).unwrap(), request);
+        assert!(LoginRequest::cookie_login("player", &"a".repeat(255), 1, 0, 44).is_err());
+        assert!(LoginRequest::cookie_login("player", "bad\0token", 1, 0, 44).is_err());
+        assert!(!format!("{request:?}").contains(&token));
     }
 }

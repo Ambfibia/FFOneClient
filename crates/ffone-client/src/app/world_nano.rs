@@ -491,6 +491,21 @@ pub(super) fn active_world_nano_slot(runtime: &RuntimeStatus) -> Option<(usize, 
         .find(|(_, slot)| slot.active && slot.nano_id.is_some() && slot.skill_id > 0)
 }
 
+/// StartZipline recalls an active Nano after publishing the initial ride packet.
+pub(super) fn recall_world_nano_for_zipline(
+    rides: Query<Entity, (With<LocalPlayer>, Added<ffone_client::world_behaviour::WorldZiplineTraversal>)>,
+    mut runtime: ResMut<RuntimeStatus>,
+    mut gameplay: ResMut<ffone_client::world_behaviour::WorldGameplayIntentQueue>,
+) {
+    if rides.is_empty() { return; }
+    if let Some(index) = runtime.nano_slots.iter().position(|slot| slot.active && slot.nano_id.is_some()) {
+        if gameplay.push(ffone_protocol::packet::P_CL2FE_REQ_NANO_ACTIVE,
+            &NanoActiveRequest0104 { nano_slot: -1 }) {
+            runtime.pending_nano_activation = Some(index);
+        }
+    }
+}
+
 pub(super) fn world_nano_skill_slot(
     content: &TutorialMissionContent,
     nano_id: i16,

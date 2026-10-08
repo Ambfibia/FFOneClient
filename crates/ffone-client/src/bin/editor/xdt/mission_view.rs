@@ -3,7 +3,7 @@ use super::*;
 use mission_inline::{action, row, stack};
 use mission_skin::{BLUE, CYAN, DARK, MUTED, MissionSkin, TEXT, heading};
 use mission_workspace::Command;
-use view::{button, dynamic_button, field, label};
+use view::{button, field, label};
 
 pub(super) fn draw(
     commands: &mut Commands,
@@ -38,6 +38,7 @@ pub(super) fn draw(
         ))
         .with_children(|root| {
             toolbar(root, f, e, l, lang, width);
+            mission_server::destination(root, f, e, l, lang);
             root.spawn(Node {
                 flex_grow: 1.,
                 flex_basis: px(0),
@@ -300,8 +301,8 @@ pub(super) fn draw(
                         format!(
                             "{}  ·  {}",
                             tr(
-                                if dirty { "unsaved" } else { "saved" },
-                                if dirty { "Unsaved changes" } else { "Saved" }
+                                if dirty { "unsaved" } else if e.unpublished() { "mission.pending_work" } else { "saved" },
+                                if dirty { "Unsaved changes" } else if e.unpublished() { "Saved · Not applied to game" } else { "Saved" }
                             ),
                             tr(
                                 "mission.canvas_hint",
@@ -400,6 +401,7 @@ fn toolbar(
                     105.,
                 ),
                 (Action::Save, "mission.save_short", "Save", 115.),
+                (Action::Rewrite, "mission.rewrite", "Rewrite", 120.),
             ] {
                 button(
                     p,
@@ -818,18 +820,17 @@ fn inspector(
         .filter(|(row, _, _)| *row == r)
         .take(12)
     {
-        dynamic_button(
-            p,
-            f,
-            Action::Cell(*row, field.split('[').next().unwrap_or(field).into()),
-            format!(
-                "! {}: {}",
-                schema::field_name(field, l, lang),
-                tr(&format!("error.{reason}"), reason)
-            ),
-            false,
-            0.,
-        );
+        let message = schema::status(&schema::task_error(&e.rows()[*row],
+            format!("{field}: {reason}")), l, lang);
+        let background = Color::srgb(0.035, 0.075, 0.14);
+        p.spawn((Button, Action::Cell(*row, field.split('[').next().unwrap_or(field).into()),
+            view::ButtonTint(background), BackgroundColor(background),
+            Node {
+                width: percent(100), min_width: px(0), min_height: px(30), flex_shrink: 0.,
+                padding: UiRect::all(px(8)), border_radius: BorderRadius::all(px(4)),
+                flex_direction: FlexDirection::Column, ..default()
+            }))
+            .with_children(|p| label(p, f, format!("! {message}"), 13., TEXT));
     }
     if e.advanced {
         action(p, f, Action::Raw, "raw", "Edit JSON");

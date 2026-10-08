@@ -114,6 +114,7 @@ pub enum NativeWorldSet {
 
 impl Plugin for NativeWorldPlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(Update, square_settings::update_shader);
         install_native_terrain(app);
         app.init_resource::<NativeTerrainSpatialRegistry>()
             .init_resource::<NativeWorldStreamingStatus>()

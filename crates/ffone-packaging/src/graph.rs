@@ -194,14 +194,25 @@ fn validate_character_route(model: &Value) -> Result<(), String> {
         "mob" => "mobs",
         "npc" => "npcs",
         "fusion" => "fusions",
-        "shared" => "shared",
         "shiny" => "shinies",
         other => return Err(format!("unsupported character category {other:?}")),
     };
+    // Accepted IDs survive classification changes (for example shared/npc_ed
+    // now belongs to npcs). Category owns the physical directory; the ID still
+    // owns the package slug, independently of its original namespace.
     let slug = id
-        .strip_prefix(&format!("{category}/"))
-        .filter(|value| !value.is_empty() && !value.contains('/'))
-        .ok_or_else(|| format!("character id {id:?} does not match category {category:?}"))?;
+        .split_once('/')
+        .filter(|(namespace, slug)| {
+            matches!(
+                *namespace,
+                "nano" | "mob" | "npc" | "fusion" | "shared" | "shiny"
+            ) && !slug.is_empty()
+                && !slug.contains('/')
+                && !slug.contains('\\')
+                && !matches!(*slug, "." | "..")
+        })
+        .map(|(_, slug)| slug)
+        .ok_or_else(|| format!("character id {id:?} has no valid namespace/package slug"))?;
     let prefix = format!("characters/{directory}/{slug}/");
     // Route ids are lowercase while exported folders keep the logical model
     // name's casing (shinies/shineni_Item). The graph scan rejects paths that

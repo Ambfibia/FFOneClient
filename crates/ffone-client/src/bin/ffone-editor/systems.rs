@@ -10,7 +10,13 @@ pub(super) fn update_orbit_camera(
     mut camera: Single<&mut Transform, With<PreviewCamera>>,
     icons: Res<icon_generator::IconGenerator>,
 ) {
-    let over_viewport = !icons.active && !state.strings_open
+    if state.world_open.is_some() {
+        motions.clear();
+        wheels.clear();
+        return;
+    }
+    let over_viewport = !icons.active
+        && !state.strings_open
         && !state.xdt_open
         && window.cursor_position().is_some_and(|cursor| {
             preview_viewport_logical_rect(Vec2::new(window.width(), window.height())).is_some_and(
@@ -22,10 +28,25 @@ pub(super) fn update_orbit_camera(
                 },
             )
         });
-    if over_viewport && (mouse.pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right)) {
+    if over_viewport
+        && (mouse.pressed(MouseButton::Left)
+            || mouse.pressed(MouseButton::Right)
+            || mouse.pressed(MouseButton::Middle))
+    {
         for motion in motions.read() {
-            orbit.yaw -= motion.delta.x * 0.007;
-            orbit.pitch = (orbit.pitch + motion.delta.y * 0.006).clamp(-0.45, 1.05);
+            if mouse.pressed(MouseButton::Right) || mouse.pressed(MouseButton::Middle) {
+                let factor = orbit.distance * 0.0015;
+                let rotation = Quat::from_rotation_y(-orbit.yaw);
+                let right = rotation * -Vec3::X;
+                let up = rotation * Vec3::new(0., orbit.pitch.cos(), orbit.pitch.sin());
+                let offset = (-right * motion.delta.x + up * motion.delta.y) * factor;
+                orbit.target_xz += Vec2::new(offset.x, offset.z);
+                orbit.target_y += offset.y;
+                orbit.fit_requested = false;
+            } else {
+                orbit.yaw -= motion.delta.x * 0.007;
+                orbit.pitch = (orbit.pitch + motion.delta.y * 0.006).clamp(-0.45, 1.05);
+            }
         }
     } else {
         motions.clear();
@@ -80,4 +101,81 @@ pub(super) fn sync_preview_camera_viewport(
     };
     viewport.clamp_to_size(physical_window_size);
     camera.viewport = Some(viewport);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn right_drag_pans_with_camera_angle_and_left_drag_orbits() {
+        let state = EditorState {
+            reveal_selection: false,
+            kind: CatalogKind::Npc,
+            selected: 0,
+            search: String::new(),
+            search_focused: false,
+            strings_open: false,
+            xdt_open: false,
+            missions_open: false,
+            world_open: None,
+            viewer_tabs: BTreeMap::new(),
+            details_open: false,
+            npc_inspector: NpcInspectorTab::Details,
+            equipment_female: false,
+            equipment_category: None,
+            animation_page: 0,
+            clip_index: 0,
+            pose_mode: EditorPoseMode::Default,
+            paused: true,
+            looping: true,
+            speed: 1.,
+            turntable: false,
+            playback_revision: 0,
+        };
+        let mut app = App::new();
+        app.insert_resource(state)
+            .init_resource::<OrbitCamera>()
+            .init_resource::<ButtonInput<MouseButton>>()
+            .insert_resource(icon_generator::IconGenerator::new(PathBuf::from("unused")))
+            .add_message::<MouseMotion>()
+            .add_message::<MouseWheel>()
+            .add_systems(Update, update_orbit_camera);
+        let mut window = Window::default();
+        window.resolution.set(1280., 720.);
+        let (position, size) = preview_viewport_logical_rect(Vec2::new(1280., 720.)).unwrap();
+        window.set_cursor_position(Some(position + size * 0.5));
+        app.world_mut().spawn(window);
+        app.world_mut().spawn((PreviewCamera, Transform::default()));
+        let delta = Vec2::new(20., 10.);
+        app.world_mut()
+            .resource_mut::<ButtonInput<MouseButton>>()
+            .press(MouseButton::Right);
+        app.world_mut().write_message(MouseMotion { delta });
+        app.update();
+        let orbit = app.world().resource::<OrbitCamera>();
+        assert_eq!(orbit.yaw, 0.);
+        assert_eq!(orbit.pitch, 0.12);
+        assert!(orbit.target_xz.x > 0.);
+        assert!(orbit.target_y > 1.);
+        let target = (orbit.target_xz, orbit.target_y);
+        let mut mouse = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        mouse.release(MouseButton::Right);
+        mouse.press(MouseButton::Left);
+        app.world_mut().write_message(MouseMotion { delta });
+        app.update();
+        let orbit = app.world().resource::<OrbitCamera>();
+        assert_ne!(orbit.yaw, 0.);
+        assert_eq!((orbit.target_xz, orbit.target_y), target);
+        app.world_mut().resource_mut::<OrbitCamera>().yaw = std::f32::consts::FRAC_PI_2;
+        let mut mouse = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        mouse.release(MouseButton::Left);
+        mouse.press(MouseButton::Right);
+        app.world_mut().write_message(MouseMotion {
+            delta: Vec2::new(20., 0.),
+        });
+        app.update();
+        let orbit = app.world().resource::<OrbitCamera>();
+        assert!((orbit.target_xz.x - target.0.x).abs() < 0.0001);
+        assert!(orbit.target_xz.y > target.0.y);
+    }
 }
